@@ -1,0 +1,26 @@
+{
+  "name": "smart-agriculture-v2",
+  "version": "1.0.0",
+  "description": "智慧农业管理系统",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@amap/amap-jsapi-loader": "^1.0.1",
+    "axios": "^1.6.0",
+    "dayjs": "^1.11.0",
+    "echarts": "^5.4.0",
+    "element-plus": "^2.5.0",
+    "pinia": "^2.1.0",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "bcryptjs": "^3.0.3",
+    "vite": "^5.0.0"
+  }
+}

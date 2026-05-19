@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.weiming.smartag.mapper.WeatherDataMapper">
+
+    <select id="selectLatest" resultType="com.weiming.smartag.entity.WeatherData">
+        SELECT * FROM weather_data
+        <if test="soilId != null">
+            WHERE soil_id = #{soilId}
+        </if>
+        ORDER BY collect_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="select24HourTrend" resultType="com.weiming.smartag.entity.WeatherData">
+        SELECT * FROM weather_data
+        WHERE collect_time BETWEEN #{start} AND #{end}
+        <if test="soilId != null">
+            AND soil_id = #{soilId}
+        </if>
+        ORDER BY collect_time ASC
+    </select>
+
+</mapper>

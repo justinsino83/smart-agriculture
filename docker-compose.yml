@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: smart-ag-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: smart_agriculture
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - smart-ag-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: smart-ag-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - smart-ag-network
+
+  # EMQX MQTT Broker
+  emqx:
+    image: emqx/emqx:latest
+    container_name: smart-ag-emqx
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "18083:18083"
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: admin
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: public
+    volumes:
+      - emqx_data:/opt/emqx/data
+    networks:
+      - smart-ag-network
+
+  # 后端服务
+  backend:
+    build: ./backend
+    container_name: smart-ag-backend
+    depends_on:
+      - mysql
+      - redis
+      - emqx
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: 123456
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      MQTT_USER: admin
+      MQTT_PASS: public
+    ports:
+      - "8080:8080"
+    networks:
+      - smart-ag-network
+
+  # 前端服务
+  frontend:
+    build: .
+    container_name: smart-ag-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - smart-ag-network
+
+volumes:
+  mysql_data:
+  redis_data:
+  emqx_data:
+
+networks:
+  smart-ag-network:
+    driver: bridge

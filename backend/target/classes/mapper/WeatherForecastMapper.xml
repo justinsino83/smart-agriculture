@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.weiming.smartag.mapper.WeatherForecastMapper">
+
+    <select id="selectForecastList" resultType="com.weiming.smartag.entity.WeatherForecast">
+        SELECT * FROM weather_forecast
+        WHERE forecast_date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY forecast_date ASC
+    </select>
+
+</mapper>
