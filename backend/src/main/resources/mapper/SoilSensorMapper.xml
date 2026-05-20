@@ -6,4 +6,8 @@
         SELECT * FROM soil_sensor WHERE status = 1
     </select>
     
+    <select id="selectByCode" resultType="com.weiming.smartag.entity.SoilSensor">
+        SELECT * FROM soil_sensor WHERE device_code = #{deviceCode} LIMIT 1
+    </select>
+    
 </mapper>

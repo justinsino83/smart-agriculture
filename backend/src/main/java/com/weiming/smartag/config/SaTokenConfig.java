@@ -33,7 +33,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/api/weather/**",
                         "/api/soil/**",
                         "/api/irrigation/**",
-                        "/api/insect/**"
+                        "/api/insect/**",
+                        "/api/device/**"
                 );
     }
 
