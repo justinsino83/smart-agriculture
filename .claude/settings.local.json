@@ -8,7 +8,13 @@
       "Bash(curl -s \"http://localhost:8080/api/weather/humidity-trend\")",
       "Bash(pkill -f \"spring-boot:run\")",
       "Bash(rm -rf target)",
-      "Bash(mvn clean *)"
+      "Bash(mvn clean *)",
+      "Bash(git push *)",
+      "Bash(git config *)",
+      "Bash(nslookup *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

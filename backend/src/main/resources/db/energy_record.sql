@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS energy_record (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     device VARCHAR(100) NOT NULL COMMENT '设备名称',
     type VARCHAR(10) NOT NULL COMMENT '能耗类型：电/水',
-    usage DOUBLE COMMENT '用量',
+    `usage` DOUBLE COMMENT '用量',
     unit VARCHAR(20) COMMENT '单位：kWh 或 m³',
     cost DOUBLE COMMENT '费用(元)',
     record_time DATETIME COMMENT '记录时间',

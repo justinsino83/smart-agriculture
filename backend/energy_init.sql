@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS energy_record (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     device VARCHAR(100) NOT NULL,
     type VARCHAR(10) NOT NULL,
-    usage DOUBLE,
+    `usage` DOUBLE,
     unit VARCHAR(20),
     cost DOUBLE,
     record_time DATETIME,
