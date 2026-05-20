@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS energy_record (
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-INSERT INTO energy_record (device, type, usage, unit, cost, record_time, efficiency, remark) VALUES
+INSERT INTO energy_record (device, type, `usage`, unit, cost, record_time, efficiency, remark) VALUES
 ('热泵烘干机-01', '电', 45.6, 'kWh', 27.4, NOW(), 4, '正常运行'),
 ('热泵烘干机-02', '电', 52.3, 'kWh', 31.4, DATE_SUB(NOW(), INTERVAL 1 HOUR), 3, '高负荷运行'),
 ('灌溉设备-01', '水', 12.5, 'm³', 25.0, DATE_SUB(NOW(), INTERVAL 2 HOUR), 5, '节水模式'),
