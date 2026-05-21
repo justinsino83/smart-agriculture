@@ -169,16 +169,20 @@ const handleLogin = async () => {
       password: loginForm.password
     })
 
+    // 后端返回的格式是 { token: xxx, user: xxx }
+    const token = res?.token || res?.data?.token
+    const userData = res?.user || res?.data?.user || {}
+
     // 保存登录状态
     const userInfoData = {
       username: loginForm.username,
-      nickname: res.nickname || res.username || loginForm.username,
-      avatar: res.avatar || '',
-      roles: res.roles || ['admin'],
+      nickname: userData.realName || userData.nickname || userData.username || loginForm.username,
+      avatar: userData.avatar || '',
+      roles: userData.role ? [userData.role] : ['admin'],
       loginTime: new Date().toISOString()
     }
 
-    userStore.setToken(res.token)
+    userStore.setToken(token)
     userStore.setUserInfo(userInfoData)
 
     if (rememberMe.value) {

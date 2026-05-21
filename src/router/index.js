@@ -24,31 +24,31 @@ const routes = [
         path: '/planting',
         name: 'Planting',
         redirect: '/planting/soil',
-        meta: { title: '智慧种植', icon: 'FirstAidKit' },
+        meta: { title: '智慧种植', icon: 'Odometer' },
         children: [
           {
             path: '/planting/soil',
             name: 'SoilMonitor',
             component: () => import('@/views/planting/SoilMonitor.vue'),
-            meta: { title: '土壤监测' }
+            meta: { title: '土壤监测', icon: 'TrendCharts' }
           },
           {
             path: '/planting/irrigation',
             name: 'Irrigation',
             component: () => import('@/views/planting/Irrigation.vue'),
-            meta: { title: '智能灌溉' }
+            meta: { title: '智能灌溉', icon: 'Coffee' }
           },
           {
             path: '/planting/weather',
             name: 'Weather',
             component: () => import('@/views/planting/Weather.vue'),
-            meta: { title: '气象监测' }
+            meta: { title: '气象监测', icon: 'Sunny' }
           },
           {
             path: '/planting/pest',
             name: 'Pest',
             component: () => import('@/views/planting/Pest.vue'),
-            meta: { title: '虫情监测' }
+            meta: { title: '虫情监测', icon: 'Warning' }
           }
         ]
       },
@@ -56,13 +56,13 @@ const routes = [
         path: '/drying',
         name: 'Drying',
         component: () => import('@/views/drying/index.vue'),
-        meta: { title: '绿色烘干', icon: 'HotWater' }
+        meta: { title: '绿色烘干', icon: 'Sunrise' }
       },
       {
         path: '/storage',
         name: 'Storage',
         component: () => import('@/views/storage/index.vue'),
-        meta: { title: '智慧仓储', icon: 'OfficeBuilding' }
+        meta: { title: '智慧仓储', icon: 'Box' }
       },
       {
         path: '/energy',
@@ -74,13 +74,13 @@ const routes = [
         path: '/system',
         name: 'System',
         redirect: '/system/devices',
-        meta: { title: '系统管理', icon: 'Setting' },
+        meta: { title: '系统管理', icon: 'Tools' },
         children: [
           {
             path: '/system/devices',
             name: 'Devices',
             component: () => import('@/views/system/index.vue'),
-            meta: { title: '设备管理' }
+            meta: { title: '设备管理', icon: 'Monitor' }
           }
         ]
       }
@@ -95,7 +95,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/agridigital/'),
   routes
 })
 
@@ -105,9 +105,11 @@ router.beforeEach((to, from, next) => {
   if (to.meta.public) {
     return next()
   }
-  // 检查是否已登录
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-  if (!token) {
+  
+  // 检查是否已登录 - 同时检查 localStorage 和 sessionStorage
+  const hasToken = !!(localStorage.getItem('token') || sessionStorage.getItem('token'))
+  
+  if (!hasToken) {
     return next('/login')
   }
   next()

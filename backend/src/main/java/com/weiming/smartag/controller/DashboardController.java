@@ -1,6 +1,7 @@
 package com.weiming.smartag.controller;
 
 import com.weiming.smartag.common.Result;
+import com.weiming.smartag.service.DevicePushService;
 import com.weiming.smartag.service.DryingService;
 import com.weiming.smartag.service.IrrigationService;
 import com.weiming.smartag.service.SoilService;
@@ -23,6 +24,7 @@ public class DashboardController {
     private final IrrigationService irrigationService;
     private final DryingService dryingService;
     private final StorageService storageService;
+    private final DevicePushService devicePushService;
     
     /**
      * 获取大屏综合统计数据
@@ -105,20 +107,80 @@ public class DashboardController {
     }
     
     /**
-     * 获取实时环境数据
+     * 获取实时环境数据（从设备推送数据获取）
      */
     @GetMapping("/realtime")
     public Result<Map<String, Object>> getRealtimeData() {
         Map<String, Object> data = new HashMap<>();
         
-        // 模拟实时数据
-        data.put("temperature", 24.5 + Math.random());
-        data.put("humidity", 65.0 + Math.random() * 5);
-        data.put("windSpeed", 2.5 + Math.random());
-        data.put("pressure", 1013.0);
-        data.put("updateTime", new Date());
+        try {
+            // 获取仪表盘综合数据
+            Map<String, Object> overview = devicePushService.getDashboardOverview();
+            
+            // 提取环境数据
+            Map<String, Object> environment = (Map<String, Object>) overview.get("environment");
+            if (environment != null) {
+                data.putAll(environment);
+            }
+            
+            // 补充统计数据
+            data.put("updateTime", new Date());
+            
+            return Result.success(data);
+        } catch (Exception e) {
+            // 降级到模拟数据
+            data.put("temperature", 24.5 + Math.random());
+            data.put("humidity", 65.0 + Math.random() * 5);
+            data.put("windSpeed", 2.5 + Math.random());
+            data.put("pressure", 1013.0);
+            data.put("updateTime", new Date());
+            
+            return Result.success(data);
+        }
+    }
+    
+    /**
+     * 获取综合仪表盘数据（集成设备推送数据）
+     */
+    @GetMapping("/integrated")
+    public Result<Map<String, Object>> getIntegratedData() {
+        Map<String, Object> result = new HashMap<>();
         
-        return Result.success(data);
+        // 从设备推送服务获取数据
+        try {
+            Map<String, Object> deviceData = devicePushService.getDashboardOverview();
+            result.put("deviceData", deviceData);
+        } catch (Exception e) {
+            result.put("deviceData", Collections.emptyMap());
+        }
+        
+        // 从土壤服务获取数据
+        try {
+            result.put("soilData", soilService.getStatistics());
+        } catch (Exception e) {
+            result.put("soilData", Collections.emptyMap());
+        }
+        
+        // 从其他服务获取数据
+        try {
+            result.put("irrigationData", irrigationService.getStatistics("day"));
+        } catch (Exception e) {
+            result.put("irrigationData", Collections.emptyMap());
+        }
+        
+        try {
+            result.put("dryingData", dryingService.getStatistics());
+        } catch (Exception e) {
+            result.put("dryingData", Collections.emptyMap());
+        }
+        
+        try {
+            result.put("storageData", storageService.getStatistics());
+        } catch (Exception e) {
+            result.put("storageData", Collections.emptyMap());
+        }
+        
+        return Result.success(result);
     }
     
     /**

@@ -25,4 +25,14 @@ public interface EnergyService extends IService<EnergyRecord> {
      * 获取设备能耗占比
      */
     List<Map<String, Object>> getDeviceUsage();
+    
+    /**
+     * 获取能耗趋势数据
+     */
+    List<Map<String, Object>> getTrendData(String period);
+    
+    /**
+     * 获取能耗统计概览
+     */
+    Map<String, Object> getStatistics();
 }

@@ -2,17 +2,19 @@ package com.weiming.smartag.controller;
 
 import com.weiming.smartag.common.Result;
 import com.weiming.smartag.entity.DevicePushData;
-import com.weiming.smartag.mapper.DevicePushDataMapper;
+import com.weiming.smartag.service.DevicePushService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -27,7 +29,7 @@ import java.util.Map;
 @Tag(name = "设备数据推送", description = "接收传感器推送数据")
 public class DevicePushController {
     
-    private final DevicePushDataMapper devicePushDataMapper;
+    private final DevicePushService devicePushService;
     
     /**
      * HTTP POST 接收设备推送数据
@@ -39,8 +41,14 @@ public class DevicePushController {
         try {
             log.info("收到设备推送数据: {}", payload);
             
+            // 数据验证
+            String clientId = getStringValue(payload, "clientId");
+            if (clientId == null || clientId.trim().isEmpty()) {
+                return Result.fail("clientId不能为空");
+            }
+            
             DevicePushData data = new DevicePushData();
-            data.setClientId(getStringValue(payload, "clientId"));
+            data.setClientId(clientId);
             data.setDetectedTime(parseDateTime(payload.get("detectedTime")));
             data.setCreateTime(LocalDateTime.now());
             
@@ -156,10 +164,14 @@ public class DevicePushController {
             data.setLeafTemperature(getBigDecimal(payload, "Leaftemperature"));
             data.setHeatFlux(getBigDecimal(payload, "Heatflux"));
             
-            devicePushDataMapper.insert(data);
+            boolean saved = devicePushService.savePushData(data);
             
-            log.info("数据保存成功, ID: {}, clientId: {}", data.getId(), data.getClientId());
-            return Result.success("数据接收成功");
+            if (saved) {
+                log.info("数据保存成功, ID: {}, clientId: {}", data.getId(), data.getClientId());
+                return Result.success("数据接收成功");
+            } else {
+                return Result.fail("数据保存失败");
+            }
             
         } catch (Exception e) {
             log.error("数据保存失败", e);
@@ -168,21 +180,69 @@ public class DevicePushController {
     }
     
     /**
+     * 获取仪表盘综合数据
+     */
+    @GetMapping("/dashboard/overview")
+    @Operation(summary = "获取仪表盘综合数据", description = "获取设备数据、环境数据、告警信息等综合数据")
+    public Result<Map<String, Object>> getDashboardOverview() {
+        try {
+            Map<String, Object> data = devicePushService.getDashboardOverview();
+            return Result.success(data);
+        } catch (Exception e) {
+            log.error("获取仪表盘数据失败", e);
+            return Result.fail("获取数据失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取活跃设备列表
+     */
+    @GetMapping("/devices/active")
+    @Operation(summary = "获取活跃设备列表", description = "获取最近24小时有数据的设备")
+    public Result<List<Map<String, Object>>> getActiveDevices() {
+        try {
+            List<Map<String, Object>> devices = devicePushService.getActiveDevices();
+            return Result.success(devices);
+        } catch (Exception e) {
+            log.error("获取活跃设备失败", e);
+            return Result.fail("获取设备失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取数据趋势
+     */
+    @GetMapping("/trend")
+    @Operation(summary = "获取数据趋势", description = "获取指定时间范围内的数据趋势用于图表展示")
+    public Result<Map<String, List<Object>>> getTrendData(
+            @RequestParam(required = true) String clientId,
+            @RequestParam(defaultValue = "24") int hours) {
+        try {
+            Map<String, List<Object>> trend = devicePushService.getTrendData(clientId, hours);
+            return Result.success(trend);
+        } catch (Exception e) {
+            log.error("获取趋势数据失败", e);
+            return Result.fail("获取趋势数据失败: " + e.getMessage());
+        }
+    }
+    
+    /**
      * 获取推送数据历史记录
      */
     @GetMapping("/history")
-    @Operation(summary = "获取推送数据历史")
-    public Result<?> getHistory(
+    @Operation(summary = "获取推送数据历史", description = "支持按设备、时间范围、分页查询")
+    public Result<Map<String, Object>> getHistory(
             @RequestParam(required = false) String clientId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         try {
-            var lambdaQuery = devicePushDataMapper.selectList(null);
-            // TODO: 添加分页和条件查询
-            return Result.success(lambdaQuery);
+            Map<String, Object> data = devicePushService.getHistoryData(clientId, startTime, endTime, page, size);
+            return Result.success(data);
         } catch (Exception e) {
             log.error("查询失败", e);
-            return Result.fail("查询失败");
+            return Result.fail("查询失败: " + e.getMessage());
         }
     }
     
@@ -193,13 +253,31 @@ public class DevicePushController {
     @Operation(summary = "获取最新推送数据")
     public Result<DevicePushData> getLatest(@RequestParam String clientId) {
         try {
-            var data = devicePushDataMapper.selectList(null).stream()
-                    .filter(d -> clientId.equals(d.getClientId()))
-                    .reduce((first, second) -> second);
-            return data.map(Result::success).orElse(Result.fail("无数据"));
+            DevicePushData data = devicePushService.getLatestData(clientId);
+            if (data != null) {
+                return Result.success(data);
+            } else {
+                return Result.fail("无数据");
+            }
         } catch (Exception e) {
             log.error("查询失败", e);
-            return Result.fail("查询失败");
+            return Result.fail("查询失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取统计数据
+     */
+    @GetMapping("/statistics")
+    @Operation(summary = "获取统计数据")
+    public Result<Map<String, Object>> getStatistics(
+            @RequestParam(required = false) String clientId) {
+        try {
+            Map<String, Object> stats = devicePushService.getStatistics(clientId);
+            return Result.success(stats);
+        } catch (Exception e) {
+            log.error("获取统计失败", e);
+            return Result.fail("获取统计失败: " + e.getMessage());
         }
     }
     

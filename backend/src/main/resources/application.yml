@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8280
   address: 0.0.0.0
   servlet:
     encoding:
@@ -13,17 +13,35 @@ spring:
   autoconfigure:
     exclude: []
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/smart_agriculture?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${MYSQL_HOST:110.42.225.206}:${MYSQL_PORT:3308}/smart_agriculture?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true
     username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:123456}
+    password: ${MYSQL_PASSWORD:0p-0p-0p-}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 连接池基本配置
+      minimum-idle: 5
+      maximum-pool-size: 20
+      pool-name: SmartAgHikariCP
+      
+      # 防止连接超时关闭的关键配置
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      
+      # 连接有效性测试配置（重要！）
+      connection-test-query: SELECT 1
+      validation-timeout: 5000
+      
+      # 连接初始化SQL
+      connection-init-sql: SET NAMES utf8mb4
   sql:
     init:
       mode: never
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:110.42.225.206}
     port: ${REDIS_PORT:6379}
-    database: 0
+    database: 4
+    password: 123456
 
 mybatis:
   configuration:
@@ -34,6 +52,7 @@ mybatis:
 
 sa-token:
   token-name: Authorization
+  token-prefix: Bearer
   timeout: 86400
   active-timeout: -1
   is-concurrent: true
@@ -52,8 +71,8 @@ insect:
   api:
     base-url: http://182.40.36.93:8900
     appName: Spore
-    username: ktdz
-    password: ktdz
+    username: ft202603010
+    password: ft202603010
   sync:
     # 同步周期（分钟）
     interval: 30

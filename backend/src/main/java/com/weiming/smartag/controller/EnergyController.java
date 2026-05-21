@@ -44,4 +44,20 @@ public class EnergyController {
     public Result<List<Map<String, Object>>> getDeviceUsage() {
         return Result.success(energyService.getDeviceUsage());
     }
+    
+    /**
+     * 获取能耗趋势数据
+     */
+    @GetMapping("/trend")
+    public Result<List<Map<String, Object>>> getTrend(@RequestParam(defaultValue = "day") String period) {
+        return Result.success(energyService.getTrendData(period));
+    }
+    
+    /**
+     * 获取能耗统计概览
+     */
+    @GetMapping("/statistics")
+    public Result<Map<String, Object>> getStatistics() {
+        return Result.success(energyService.getStatistics());
+    }
 }

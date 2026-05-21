@@ -20,7 +20,7 @@
           </div>
           <div class="stat-label">{{ stat.label }}</div>
           <div v-if="stat.trend && !loading" class="stat-trend" :class="stat.trend > 0 ? 'up' : 'down'">
-            <el-icon><ArrowUp v-if="stat.trend > 0" /><ArrowDown v-else /></el-icon>
+            <el-icon><component :is="stat.trend > 0 ? ArrowUp : ArrowDown" /></el-icon>
             <span>{{ Math.abs(stat.trend) }}%</span>
             <span class="trend-text">较昨日</span>
           </div>
@@ -47,9 +47,25 @@
               />
             </div>
           </div>
+          <div class="filter-bar">
+            <el-select v-model="filterCrop" placeholder="作物筛选" clearable size="small" style="width: 120px;">
+              <el-option label="全部" value="" />
+              <el-option label="水稻" value="水稻" />
+              <el-option label="小麦" value="小麦" />
+              <el-option label="玉米" value="玉米" />
+            </el-select>
+            <el-select v-model="filterStatus" placeholder="状态筛选" clearable size="small" style="width: 120px;">
+              <el-option label="全部" value="" />
+              <el-option label="正常" value="normal" />
+              <el-option label="干旱" value="dry" />
+              <el-option label="过湿" value="wet" />
+              <el-option label="需施肥" value="fertilize" />
+            </el-select>
+            <el-button type="primary" size="small" @click="resetFilters">重置</el-button>
+          </div>
           <div class="card-body">
             <!-- 真实高德地图 -->
-            <AMap :fields="fieldDistribution" @loaded="onMapLoaded" />
+            <AMap :fields="filteredFields" @loaded="onMapLoaded" />
           </div>
         </div>
       </div>
@@ -69,7 +85,7 @@
             </el-button>
           </div>
           <div class="card-body">
-            <div v-if="dryingBatches.length === 0" class="empty-state">
+            <div v-if="displayDryingBatches.length === 0" class="empty-state">
               <el-empty description="暂无进行中的烘干批次" :image-size="80">
                 <el-button type="primary" size="small" @click="$router.push('/drying')">
                   创建批次
@@ -77,7 +93,7 @@
               </el-empty>
             </div>
             <div
-              v-for="(batch, index) in dryingBatches"
+              v-for="(batch, index) in displayDryingBatches"
               :key="batch.id"
               class="batch-item"
               :class="{ 'completed': batch.status === 'completed', 'pulse': batch.status === 'running' }"
@@ -242,7 +258,32 @@ import {
 } from '@element-plus/icons-vue'
 
 const dashboardStore = useDashboardStore()
-const { stats, activities, dryingBatches, fieldDistribution, energyData } = dashboardStore
+const { stats, activities, dryingBatches, fieldDistribution, energyData, loadAllData } = dashboardStore
+
+// 只显示最新4条烘干数据
+const displayDryingBatches = computed(() => {
+  return (dryingBatches || []).slice(0, 4)
+})
+
+// 筛选条件
+const filterCrop = ref('')
+const filterStatus = ref('')
+
+const filteredFields = computed(() => {
+    if (!fieldDistribution || !Array.isArray(fieldDistribution)) {
+      return []
+    }
+    return fieldDistribution.filter(field => {
+      if (filterCrop.value && field.crop !== filterCrop.value) return false
+      if (filterStatus.value && field.status !== filterStatus.value) return false
+      return true
+    })
+  })
+
+const resetFilters = () => {
+  filterCrop.value = ''
+  filterStatus.value = ''
+}
 
 // 加载状态
 const loading = ref(true)
@@ -251,6 +292,7 @@ const energyRefreshing = ref(false)
 
 // 定时器
 let energyTimer = null
+let dataTimer = null
 
 const statsList = computed(() => [
   {
@@ -258,7 +300,7 @@ const statsList = computed(() => [
     value: stats.totalLandArea,
     unit: '亩',
     label: '总种植面积',
-    icon: 'FirstAidKit',
+    icon: FirstAidKit,
     type: 'primary'
   },
   {
@@ -266,7 +308,7 @@ const statsList = computed(() => [
     value: `${stats.deviceOnline}/${stats.deviceTotal}`,
     unit: '',
     label: '设备在线/总数',
-    icon: 'Check',
+    icon: Check,
     type: stats.deviceOnline / stats.deviceTotal > 0.8 ? 'success' : 'warning'
   },
   {
@@ -274,7 +316,7 @@ const statsList = computed(() => [
     value: stats.dryingBatches,
     unit: '批次',
     label: '烘干进行中',
-    icon: 'HotWater',
+    icon: HotWater,
     type: 'primary'
   },
   {
@@ -282,7 +324,7 @@ const statsList = computed(() => [
     value: stats.powerUsage,
     unit: 'kWh',
     label: '今日用电量',
-    icon: 'Lightning',
+    icon: Lightning,
     type: 'warning',
     trend: -12
   },
@@ -291,7 +333,7 @@ const statsList = computed(() => [
     value: stats.carbonReduction,
     unit: '吨',
     label: '累计碳减排',
-    icon: 'Sunny',
+    icon: Sunny,
     type: 'success',
     trend: 8
   },
@@ -300,14 +342,14 @@ const statsList = computed(() => [
     value: stats.pendingAlerts,
     unit: '条',
     label: '待处理告警',
-    icon: 'WarningFilled',
+    icon: WarningFilled,
     type: stats.pendingAlerts > 0 ? 'danger' : 'success'
   }
 ])
 
 const fieldStats = computed(() => ({
-  totalArea: fieldDistribution.reduce((sum, f) => sum + f.area, 0)
-}))
+    totalArea: (filteredFields.value || []).reduce((sum, f) => sum + (f.area || 0), 0)
+  }))
 
 // 环形图样式
 const ringStyle = computed(() => ({
@@ -369,6 +411,9 @@ const refreshEnergy = () => {
 }
 
 onMounted(() => {
+  // 加载真实数据
+  loadAllData()
+  
   // 模拟加载完成
   setTimeout(() => {
     loading.value = false
@@ -376,10 +421,14 @@ onMounted(() => {
   
   // 每30秒刷新一次能效数据
   energyTimer = setInterval(refreshEnergy, 30000)
+  
+  // 每30秒刷新一次仪表盘数据
+  dataTimer = setInterval(loadAllData, 30000)
 })
 
 onUnmounted(() => {
   if (energyTimer) clearInterval(energyTimer)
+  if (dataTimer) clearInterval(dataTimer)
 })
 </script>
 
@@ -557,6 +606,14 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+.filter-bar {
+  padding: 12px 20px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  gap: 12px;
+}
+
 .area-tag {
   font-size: 14px;
   padding: 4px 12px;
@@ -589,6 +646,7 @@ onUnmounted(() => {
 .map-card .card-body {
   padding: 0;
   overflow: hidden;
+  height: calc(100% - 110px);
 }
 
 /* 右侧区域 */
@@ -873,10 +931,6 @@ onUnmounted(() => {
 .carbon-info.highlight {
   background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
   border-color: #52c41a;
-}
-
-.carbon-info .el-icon {
-  font-size: 18px;
 }
 
 .trees-count {

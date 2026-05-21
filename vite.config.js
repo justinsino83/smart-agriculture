@@ -4,6 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue()],
+  base: '/agridigital/',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')

@@ -169,57 +169,111 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import { dryingApi } from '@/api'
 
 const showCreateDialog = ref(false)
 const creating = ref(false)
+const loading = ref(true)
 const selectedBatch = ref(null)
 const processChart = ref(null)
 let processChartInstance = null
 
-const batches = ref([
-  { 
-    id: 'DH20240320001', 
-    grainType: '水稻', 
-    dryingMethod: '热泵烘干',
-    status: 'running', 
-    initialMoisture: 25.5, 
-    currentMoisture: 15.2, 
-    targetMoisture: 13.5, 
-    progress: 65,
-    currentStage: '恒速干燥阶段',
-    currentTemp: 54,
-    targetTemp: 55,
-    heatingRate: 2.5,
-    uniformity: 2.1,
-    brokenRate: 3.2,
-    loadAmount: 15
-  },
-  { 
-    id: 'DH20240319002', 
-    grainType: '小麦', 
-    dryingMethod: '生物质烘干',
-    status: 'completed', 
-    initialMoisture: 22.0, 
-    currentMoisture: 13.2, 
-    targetMoisture: 13.5, 
-    progress: 100,
-    currentStage: '出仓',
-    uniformity: 1.8,
-    brokenRate: 2.1,
-    loadAmount: 20
-  },
-  { 
-    id: 'DH20240318003', 
-    grainType: '玉米', 
-    dryingMethod: '热泵烘干',
-    status: 'pending', 
-    initialMoisture: 28.0, 
-    currentMoisture: 28.0, 
-    targetMoisture: 14.0, 
-    progress: 0,
-    loadAmount: 18
+const batches = ref([])
+
+// 加载烘干批次数据
+const loadBatches = async () => {
+  try {
+    const data = await dryingApi.getBatches()
+    if (data && data.length > 0) {
+      batches.value = data
+    } else {
+      // 使用默认数据
+      batches.value = [
+        { 
+          id: 'DH20240320001', 
+          grainType: '水稻', 
+          dryingMethod: '热泵烘干',
+          status: 'running', 
+          initialMoisture: 25.5, 
+          currentMoisture: 15.2, 
+          targetMoisture: 13.5, 
+          progress: 65,
+          currentStage: '恒速干燥阶段',
+          currentTemp: 54,
+          targetTemp: 55,
+          heatingRate: 2.5,
+          uniformity: 2.1,
+          brokenRate: 3.2,
+          loadAmount: 15
+        },
+        { 
+          id: 'DH20240319002', 
+          grainType: '小麦', 
+          dryingMethod: '生物质烘干',
+          status: 'completed', 
+          initialMoisture: 22.0, 
+          currentMoisture: 13.2, 
+          targetMoisture: 13.5, 
+          progress: 100,
+          currentStage: '出仓',
+          uniformity: 1.8,
+          brokenRate: 2.1,
+          loadAmount: 20
+        },
+        { 
+          id: 'DH20240318003', 
+          grainType: '玉米', 
+          dryingMethod: '热泵烘干',
+          status: 'pending', 
+          initialMoisture: 28.0, 
+          currentMoisture: 28.0, 
+          targetMoisture: 14.0, 
+          progress: 0,
+          loadAmount: 18
+        }
+      ]
+    }
+  } catch (error) {
+    console.error('加载烘干批次失败:', error)
+    ElMessage.error('加载数据失败')
+    // 使用默认数据
+    batches.value = [
+      { 
+        id: 'DH20240320001', 
+        grainType: '水稻', 
+        dryingMethod: '热泵烘干',
+        status: 'running', 
+        initialMoisture: 25.5, 
+        currentMoisture: 15.2, 
+        targetMoisture: 13.5, 
+        progress: 65,
+        currentStage: '恒速干燥阶段',
+        currentTemp: 54,
+        targetTemp: 55,
+        heatingRate: 2.5,
+        uniformity: 2.1,
+        brokenRate: 3.2,
+        loadAmount: 15
+      },
+      { 
+        id: 'DH20240319002', 
+        grainType: '小麦', 
+        dryingMethod: '生物质烘干',
+        status: 'completed', 
+        initialMoisture: 22.0, 
+        currentMoisture: 13.2, 
+        targetMoisture: 13.5, 
+        progress: 100,
+        currentStage: '出仓',
+        uniformity: 1.8,
+        brokenRate: 2.1,
+        loadAmount: 20
+      }
+    ]
+  } finally {
+    loading.value = false
   }
-])
+}
 
 const createForm = reactive({ 
   grainType: '', 
@@ -420,51 +474,65 @@ const initProcessChart = () => {
 
 const createBatch = async () => {
   creating.value = true
-  await new Promise(r => setTimeout(r, 1000))
-  const newBatch = { 
-    id: `DH${Date.now()}`, 
-    grainType: createForm.grainType,
-    dryingMethod: createForm.dryingMethod,
-    status: 'pending', 
-    initialMoisture: createForm.initialMoisture, 
-    currentMoisture: createForm.initialMoisture, 
-    targetMoisture: createForm.targetMoisture,
-    loadAmount: createForm.loadAmount,
-    progress: 0,
-    uniformity: 0,
-    brokenRate: 0,
-    heatingRate: 0
+  try {
+    await dryingApi.createBatch({
+      grainType: createForm.grainType,
+      dryingMethod: createForm.dryingMethod,
+      initialMoisture: createForm.initialMoisture,
+      targetMoisture: createForm.targetMoisture,
+      loadAmount: createForm.loadAmount
+    })
+    ElMessage.success('批次创建成功')
+    // 重新加载列表
+    await loadBatches()
+    showCreateDialog.value = false
+  } catch (error) {
+    console.error('创建批次失败:', error)
+    ElMessage.error('创建批次失败')
+  } finally {
+    creating.value = false
   }
-  batches.value.unshift(newBatch)
-  ElMessage.success('批次创建成功')
-  showCreateDialog.value = false
-  creating.value = false
 }
 
-const startBatch = () => { 
-  ElMessageBox.confirm('确认开始烘干？请确保粮食已入仓完成。', '提示', { 
-    confirmButtonText: '确认', 
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => { 
+const startBatch = async () => { 
+  try {
+    await ElMessageBox.confirm('确认开始烘干？请确保粮食已入仓完成。', '提示', { 
+      confirmButtonText: '确认', 
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await dryingApi.startBatch(selectedBatch.value.id)
     selectedBatch.value.status = 'running'
     selectedBatch.value.currentStage = '预热阶段'
     ElMessage.success('烘干已开始')
-  }) 
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('启动烘干失败:', error)
+      ElMessage.error('启动失败')
+    }
+  }
 }
 
-const stopBatch = () => { 
-  ElMessageBox.confirm('确认停止烘干？这会导致当前批次异常终止。', '警告', { 
-    confirmButtonText: '确认停止', 
-    cancelButtonText: '取消',
-    type: 'error'
-  }).then(() => { 
+const stopBatch = async () => { 
+  try {
+    await ElMessageBox.confirm('确认停止烘干？这会导致当前批次异常终止。', '警告', { 
+      confirmButtonText: '确认停止', 
+      cancelButtonText: '取消',
+      type: 'error'
+    })
+    await dryingApi.stopBatch(selectedBatch.value.id)
     selectedBatch.value.status = 'pending'
     ElMessage.success('烘干已停止')
-  }) 
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('停止烘干失败:', error)
+      ElMessage.error('停止失败')
+    }
+  }
 }
 
-onMounted(() => { 
+onMounted(async () => { 
+  await loadBatches()
   if (batches.value.length > 0) { selectBatch(batches.value[0]) } 
   window.addEventListener('resize', () => { processChartInstance?.resize() }) 
 })

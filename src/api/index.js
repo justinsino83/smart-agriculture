@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://110.42.225.206:8280',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -52,9 +52,13 @@ api.interceptors.response.use(
           break
         case 401:
           message = 'Session expired, please login again'
+          // 清除所有认证信息
           localStorage.removeItem('token')
+          localStorage.removeItem('userInfo')
+          sessionStorage.removeItem('token')
+          sessionStorage.removeItem('userInfo')
           setTimeout(() => {
-            window.location.href = '/#/login'
+            window.location.href = '/agridigital/login'
           }, 500)
           break
         case 403:
@@ -127,6 +131,56 @@ export const irrigationApi = {
   createTask: (task) => api.post('/api/irrigation/task', task),
   getStatistics: (period = 'day') => api.get('/api/irrigation/statistics', { params: { period } }),
   getTrend: (days = 7) => api.get('/api/irrigation/trend', { params: { days } })
+}
+
+// Device Push APIs
+export const devicePushApi = {
+  pushData: (data) => api.post('/api/device/push', data),
+  getDashboardOverview: () => api.get('/api/device/dashboard/overview'),
+  getActiveDevices: () => api.get('/api/device/devices/active'),
+  getTrend: (clientId, hours = 24) => api.get('/api/device/trend', { params: { clientId, hours } }),
+  getHistory: (params) => api.get('/api/device/history', { params }),
+  getLatest: (clientId) => api.get('/api/device/latest', { params: { clientId } }),
+  getStatistics: (clientId) => api.get('/api/device/statistics', { params: { clientId } })
+}
+
+// Drying APIs
+export const dryingApi = {
+  getBatches: () => api.get('/api/drying/batches'),
+  getBatchDetail: (batchId) => api.get(`/api/drying/batch/${batchId}`),
+  createBatch: (data) => api.post('/api/drying/batch', data),
+  startBatch: (batchId) => api.post(`/api/drying/batch/${batchId}/start`),
+  stopBatch: (batchId) => api.post(`/api/drying/batch/${batchId}/stop`),
+  getProcessData: (batchId) => api.get(`/api/drying/batch/${batchId}/process`),
+  getStatistics: () => api.get('/api/drying/statistics')
+}
+
+// Storage APIs
+export const storageApi = {
+  getOverview: () => api.get('/api/storage/overview'),
+  getStockList: (params) => api.get('/api/storage/stock', { params }),
+  getStockDetail: (stockId) => api.get(`/api/storage/stock/${stockId}`),
+  stockIn: (data) => api.post('/api/storage/stock-in', data),
+  stockOut: (data) => api.post('/api/storage/stock-out', data),
+  getAlerts: () => api.get('/api/storage/alerts'),
+  getTrace: (stockId) => api.get(`/api/storage/stock/${stockId}/trace`)
+}
+
+// Energy APIs
+export const energyApi = {
+  getTodayStats: () => api.get('/api/energy/today'),
+  getList: (params) => api.get('/api/energy/list', { params }),
+  getTrend: (period) => api.get('/api/energy/trend', { params: { period } }),
+  getDeviceUsage: () => api.get('/api/energy/device-usage'),
+  getStatistics: () => api.get('/api/energy/statistics')
+}
+
+// System/Device APIs
+export const systemApi = {
+  getDevices: () => api.get('/api/system/devices'),
+  getDeviceDetail: (deviceId) => api.get(`/api/system/device/${deviceId}`),
+  updateDevice: (deviceId, data) => api.put(`/api/system/device/${deviceId}`, data),
+  getLogs: (params) => api.get('/api/system/logs', { params })
 }
 
 export default api

@@ -13,6 +13,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +111,53 @@ public class EnergyServiceImpl extends ServiceImpl<EnergyRecordMapper, EnergyRec
                 return item;
             })
             .collect(Collectors.toList());
+    }
+    
+    @Override
+    public List<Map<String, Object>> getTrendData(String period) {
+        // 生成趋势数据，根据period返回不同时间范围的数据
+        List<Map<String, Object>> trend = new ArrayList<>();
+        int count = "week".equals(period) ? 7 : ("month".equals(period) ? 30 : 24);
+        
+        for (int i = count - 1; i >= 0; i--) {
+            Map<String, Object> item = new HashMap<>();
+            double baseValue = 40 + Math.random() * 20;
+            double value = BigDecimal.valueOf(baseValue).setScale(1, RoundingMode.HALF_UP).doubleValue();
+            
+            if ("week".equals(period)) {
+                String[] weekDays = {"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+                item.put("name", weekDays[(7 - i) % 7]);
+            } else if ("month".equals(period)) {
+                item.put("name", String.format("%d日", i + 1));
+            } else {
+                item.put("name", String.format("%d:00", (24 - i) % 24));
+            }
+            item.put("value", value);
+            trend.add(item);
+        }
+        
+        return trend;
+    }
+    
+    @Override
+    public Map<String, Object> getStatistics() {
+        // 获取综合统计数据
+        Map<String, Object> stats = new HashMap<>();
+        
+        // 今日数据
+        Map<String, Object> todayStats = getTodayStats();
+        stats.putAll(todayStats);
+        
+        // 设备使用占比
+        stats.put("deviceUsage", getDeviceUsage());
+        
+        // 补充一些其他指标
+        stats.put("greenPower", BigDecimal.valueOf(85 + Math.random() * 10).setScale(1, RoundingMode.HALF_UP).doubleValue());
+        stats.put("solarUsage", BigDecimal.valueOf(1000 + Math.random() * 500).setScale(1, RoundingMode.HALF_UP).doubleValue());
+        stats.put("gridUsage", BigDecimal.valueOf(100 + Math.random() * 200).setScale(1, RoundingMode.HALF_UP).doubleValue());
+        stats.put("treesEquivalent", BigDecimal.valueOf(100 + Math.random() * 200).setScale(1, RoundingMode.HALF_UP).doubleValue());
+        
+        return stats;
     }
     
     private Map<String, Object> toMap(EnergyRecord record) {

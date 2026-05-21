@@ -33,7 +33,7 @@
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon cyan"><el-icon><Leaf /></el-icon></div>
+        <div class="stat-icon cyan"><el-icon><Odometer /></el-icon></div>
         <div class="stat-content">
           <div class="stat-value">{{ carbonSaved }}<span class="unit">kg</span></div>
           <div class="stat-label">累计减碳</div>
@@ -124,11 +124,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
-import { Lightning, Money, TrendCharts } from '@element-plus/icons-vue'
+import { ref, onMounted, watch, nextTick, onUnmounted } from 'vue'
+import { Lightning, Money, TrendCharts, Odometer } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import api from '@/api'
+import { energyApi } from '@/api'
 
 // 加载状态
 const loading = ref(true)
@@ -156,7 +156,7 @@ const total = ref(0)
 // 加载统计数据
 const loadStats = async () => {
   try {
-    const response = await api.get('/api/energy/today')
+    const response = await energyApi.getTodayStats()
     if (response) {
       todayPower.value = response.todayPower || 0
       todayCost.value = response.todayCost || 0
@@ -173,16 +173,17 @@ const loadStats = async () => {
   }
 }
 
-// 加载能耗列表
+// 加载能耗明细
 const loadEnergyList = async () => {
   tableLoading.value = true
   try {
     // 调用实际API获取能耗明细
-    const response = await api.get('/api/energy/list', {
-      params: { page: currentPage.value, size: pageSize.value }
+    const response = await energyApi.getList({ 
+      page: currentPage.value, 
+      size: pageSize.value 
     })
-    if (response && response.list) {
-      energyList.value = response.list
+    if (response) {
+      energyList.value = response.list || response.records || []
       total.value = response.total || 0
     }
   } catch (error) {
@@ -204,15 +205,26 @@ const loadEnergyList = async () => {
 // 加载图表数据
 const loadChartData = async () => {
   try {
-    const response = await api.get('/api/energy/device-usage')
-    if (response && response.length > 0) {
-      initDeviceChart(response)
+    const [deviceUsage, trendData] = await Promise.all([
+      energyApi.getDeviceUsage(),
+      energyApi.getTrend(chartPeriod.value)
+    ])
+    
+    if (deviceUsage && deviceUsage.length > 0) {
+      initDeviceChart(deviceUsage)
     } else {
       initDeviceChart(generateDefaultDeviceUsage())
+    }
+    
+    if (trendData && trendData.length > 0) {
+      initPowerChart(trendData)
+    } else {
+      initPowerChart(generateDefaultTrend())
     }
   } catch (error) {
     console.error('加载图表数据失败:', error)
     initDeviceChart(generateDefaultDeviceUsage())
+    initPowerChart(generateDefaultTrend())
   }
 }
 
@@ -234,70 +246,72 @@ const generateDefaultDeviceUsage = () => {
 
 const initPowerChart = (data) => {
   if (!powerChart.value) return
-  nextTick(() => {
-    powerChartInstance = echarts.init(powerChart.value)
-    const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`)
-    
-    const option = {
-      tooltip: { trigger: 'axis' },
-      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: {
-        type: 'category',
-        boundaryGap: false,
-        data: hours,
-        axisLine: { lineStyle: { color: '#d9d9d9' } },
-        axisLabel: { color: '#8c8c8c' }
+  
+  powerChartInstance = echarts.init(powerChart.value)
+  const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`)
+  
+  const chartData = data && data.length > 0 ? data : generateDefaultTrend()
+  
+  const option = {
+    tooltip: { trigger: 'axis' },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: hours,
+      axisLine: { lineStyle: { color: '#d9d9d9' } },
+      axisLabel: { color: '#8c8c8c' }
+    },
+    yAxis: {
+      type: 'value',
+      name: '功率(kW)',
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: '#f0f0f0' } }
+    },
+    series: [{
+      name: '实时功率',
+      type: 'line',
+      smooth: true,
+      data: chartData,
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(250, 173, 20, 0.4)' },
+          { offset: 1, color: 'rgba(250, 173, 20, 0.05)' }
+        ])
       },
-      yAxis: {
-        type: 'value',
-        name: '功率(kW)',
-        axisLine: { show: false },
-        splitLine: { lineStyle: { color: '#f0f0f0' } }
-      },
-      series: [{
-        name: '实时功率',
-        type: 'line',
-        smooth: true,
-        data: data,
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(250, 173, 20, 0.4)' },
-            { offset: 1, color: 'rgba(250, 173, 20, 0.05)' }
-          ])
-        },
-        itemStyle: { color: '#faad14' },
-        lineStyle: { width: 3 }
-      }]
-    }
-    powerChartInstance.setOption(option)
-  })
+      itemStyle: { color: '#faad14' },
+      lineStyle: { width: 3 }
+    }]
+  }
+  powerChartInstance.setOption(option)
 }
 
 const initDeviceChart = (data) => {
   if (!deviceChart.value) return
-  nextTick(() => {
-    deviceChartInstance = echarts.init(deviceChart.value)
-    
-    const option = {
-      tooltip: { trigger: 'item', formatter: '{b}: {c}kWh ({d}%)' },
-      legend: {
-        orient: 'vertical',
-        right: '5%',
-        top: 'center',
-        textStyle: { color: '#595959' }
-      },
-      series: [{
-        type: 'pie',
-        radius: ['45%', '70%'],
-        center: ['35%', '50%'],
-        avoidLabelOverlap: false,
-        label: { show: false },
-        labelLine: { show: false },
-        data: data
-      }]
-    }
-    deviceChartInstance.setOption(option)
-  })
+  
+  deviceChartInstance = echarts.init(deviceChart.value)
+  
+  const chartData = data && data.length > 0 ? data : generateDefaultDeviceUsage()
+  
+  const option = {
+    tooltip: { trigger: 'item', formatter: '{b}: {c}kWh ({d}%)' },
+    legend: {
+      orient: 'vertical',
+      right: '5%',
+      top: 'center',
+      textStyle: { color: '#595959' }
+    },
+    series: [{
+      type: 'pie',
+      radius: ['45%', '70%'],
+      center: ['35%', '50%'],
+      avoidLabelOverlap: false,
+      label: { show: false },
+      labelLine: { show: false },
+      data: chartData
+    }]
+  }
+  deviceChartInstance.setOption(option)
 }
 
 const onPeriodChange = (period) => {
@@ -306,13 +320,24 @@ const onPeriodChange = (period) => {
   loadChartData()
 }
 
+// 初始化图表
+const initCharts = () => {
+  nextTick(() => {
+    initPowerChart()
+    initDeviceChart()
+  })
+}
+
 onMounted(async () => {
   try {
     await Promise.all([
       loadStats(),
-      loadChartData(),
       loadEnergyList()
     ])
+    // 确保DOM渲染完成后初始化图表
+    await nextTick()
+    await nextTick()
+    await loadChartData()
   } catch (error) {
     console.error('初始化数据失败:', error)
     ElMessage.error('数据加载失败，请检查网络')
@@ -325,6 +350,15 @@ onMounted(async () => {
     powerChartInstance?.resize()
     deviceChartInstance?.resize()
   })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', () => {
+    powerChartInstance?.resize()
+    deviceChartInstance?.resize()
+  })
+  powerChartInstance?.dispose()
+  deviceChartInstance?.dispose()
 })
 </script>
 

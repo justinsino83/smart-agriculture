@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS drying_batch (
     batch_no VARCHAR(30) NOT NULL COMMENT '批次号',
     grain_type VARCHAR(20) COMMENT '粮食品种',
     initial_moisture DOUBLE COMMENT '初始含水率(%)',
+    start_moisture DOUBLE COMMENT '起始含水率(%)',
     target_moisture DOUBLE COMMENT '目标含水率(%)',
     current_moisture DOUBLE COMMENT '当前含水率(%)',
     weight DOUBLE COMMENT '重量(kg)',
@@ -90,9 +91,11 @@ CREATE TABLE IF NOT EXISTS drying_batch (
     device_id BIGINT COMMENT '烘干设备ID',
     start_time DATETIME COMMENT '开始时间',
     end_time DATETIME COMMENT '结束时间',
+    drying_duration INT COMMENT '烘干时长(分钟)',
     power_usage DOUBLE COMMENT '用电量(kWh)',
     create_by VARCHAR(20) COMMENT '创建人',
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='烘干批次表';
 
 -- 仓储记录表
@@ -273,19 +276,19 @@ INSERT INTO irrigation_task (task_name, device_id, status, trigger_type, plan_st
 ('灌溉任务-9号田', 9, 2, 2, DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_SUB(NOW(), INTERVAL 4 DAY), 40, 3.0, 'system');
 
 -- 插入烘干批次数据
-INSERT INTO drying_batch (batch_no, grain_type, initial_moisture, target_moisture, current_moisture, weight, status, device_id, start_time, end_time, power_usage, create_by) VALUES
-('DRY20240001', '水稻', 25.5, 14.0, 14.2, 5000.0, 4, 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), 450.5, 'admin'),
-('DRY20240002', '小麦', 22.0, 13.0, 13.5, 3500.0, 4, 2, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), 320.0, 'admin'),
-('DRY20240003', '玉米', 28.0, 15.0, 18.5, 4200.0, 2, 1, DATE_SUB(NOW(), INTERVAL 12 HOUR), NULL, 180.0, 'operator'),
-('DRY20240004', '水稻', 24.0, 14.0, 14.0, 4800.0, 4, 3, DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY), 420.0, 'operator2'),
-('DRY20240005', '大豆', 20.0, 12.0, 12.0, 2800.0, 4, 2, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 4 DAY), 250.0, 'admin'),
-('DRY20240006', '小麦', 23.5, 13.0, 13.2, 3800.0, 4, 3, DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY), 350.0, 'manager'),
-('DRY20240007', '玉米', 27.0, 15.0, 21.0, 4500.0, 1, 1, DATE_SUB(NOW(), INTERVAL 6 HOUR), NULL, 85.0, 'operator'),
-('DRY20240008', '水稻', 26.0, 14.0, 16.5, 5200.0, 2, 2, DATE_SUB(NOW(), INTERVAL 18 HOUR), NULL, 200.0, 'operator2'),
-('DRY20240009', '油菜', 18.0, 10.0, 10.0, 1500.0, 4, 3, DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 120.0, 'admin'),
-('DRY20240010', '水稻', 25.0, 14.0, 14.5, 4600.0, 4, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), DATE_SUB(NOW(), INTERVAL 7 DAY), 410.0, 'tech1'),
-('DRY20240011', '小麦', 22.5, 13.0, 13.0, 3600.0, 4, 2, DATE_SUB(NOW(), INTERVAL 9 DAY), DATE_SUB(NOW(), INTERVAL 8 DAY), 330.0, 'tech2'),
-('DRY20240012', '玉米', 28.5, 15.0, 15.0, 4000.0, 4, 3, DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_SUB(NOW(), INTERVAL 9 DAY), 380.0, 'manager');
+INSERT INTO drying_batch (batch_no, grain_type, initial_moisture, start_moisture, target_moisture, current_moisture, weight, status, device_id, start_time, end_time, drying_duration, power_usage, create_by) VALUES
+('DRY20240001', '水稻', 25.5, 25.5, 14.0, 14.2, 5000.0, 4, 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), 720, 450.5, 'admin'),
+('DRY20240002', '小麦', 22.0, 22.0, 13.0, 13.5, 3500.0, 4, 2, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), 600, 320.0, 'admin'),
+('DRY20240003', '玉米', 28.0, 28.0, 15.0, 18.5, 4200.0, 2, 1, DATE_SUB(NOW(), INTERVAL 12 HOUR), NULL, 360, 180.0, 'operator'),
+('DRY20240004', '水稻', 24.0, 24.0, 14.0, 14.0, 4800.0, 4, 3, DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY), 680, 420.0, 'operator2'),
+('DRY20240005', '大豆', 20.0, 20.0, 12.0, 12.0, 2800.0, 4, 2, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 4 DAY), 540, 250.0, 'admin'),
+('DRY20240006', '小麦', 23.5, 23.5, 13.0, 13.2, 3800.0, 4, 3, DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY), 620, 350.0, 'manager'),
+('DRY20240007', '玉米', 27.0, 27.0, 15.0, 21.0, 4500.0, 1, 1, DATE_SUB(NOW(), INTERVAL 6 HOUR), NULL, 180, 85.0, 'operator'),
+('DRY20240008', '水稻', 26.0, 26.0, 14.0, 16.5, 5200.0, 2, 2, DATE_SUB(NOW(), INTERVAL 18 HOUR), NULL, 480, 200.0, 'operator2'),
+('DRY20240009', '油菜', 18.0, 18.0, 10.0, 10.0, 1500.0, 4, 3, DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 480, 120.0, 'admin'),
+('DRY20240010', '水稻', 25.0, 25.0, 14.0, 14.5, 4600.0, 4, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), DATE_SUB(NOW(), INTERVAL 7 DAY), 700, 410.0, 'tech1'),
+('DRY20240011', '小麦', 22.5, 22.5, 13.0, 13.0, 3600.0, 4, 2, DATE_SUB(NOW(), INTERVAL 9 DAY), DATE_SUB(NOW(), INTERVAL 8 DAY), 610, 330.0, 'tech2'),
+('DRY20240012', '玉米', 28.5, 28.5, 15.0, 15.0, 4000.0, 4, 3, DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_SUB(NOW(), INTERVAL 9 DAY), 650, 380.0, 'manager');
 
 -- 插入仓储记录数据
 INSERT INTO storage_record (batch_no, grain_type, warehouse, quantity, moisture, quality, entry_date, expire_date, status, operator) VALUES
