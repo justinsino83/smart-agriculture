@@ -196,6 +196,7 @@ public class InsectServiceImpl implements InsectService {
                 
                 for (Map<String, Object> item : dataList) {
                     InsectData data = new InsectData();
+                    data.setId(Long.valueOf(item.get("id").toString()));
                     data.setImei((String) item.get("imeinum"));
                     data.setImageUrl((String) item.get("image"));
                     data.setScaleImageUrl((String) item.get("scaleimage"));

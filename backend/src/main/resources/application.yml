@@ -70,7 +70,8 @@ mqtt:
 insect:
   api:
     base-url: http://182.40.36.93:8900
-    appName: Spore
+#    appName: Spore
+    appName: Insects
     username: ft202603010
     password: ft202603010
   sync:

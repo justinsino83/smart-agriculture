@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -33,7 +34,6 @@ public class DevicePushController {
     
     /**
      * HTTP POST 接收设备推送数据
-     * POST /api/device/push
      */
     @PostMapping("/push")
     @Operation(summary = "接收设备推送数据", description = "接收HTTP POST推送的传感器数据")
@@ -47,9 +47,14 @@ public class DevicePushController {
                 return Result.fail("clientId不能为空");
             }
             
+            Object detectedTimeObj = payload.get("detectedTime");
+            if (detectedTimeObj == null) {
+                return Result.fail("detectedTime不能为空");
+            }
+            
             DevicePushData data = new DevicePushData();
             data.setClientId(clientId);
-            data.setDetectedTime(parseDateTime(payload.get("detectedTime")));
+            data.setDetectedTime(parseDateTime(detectedTimeObj));
             data.setCreateTime(LocalDateTime.now());
             
             // 环境数据
@@ -218,10 +223,16 @@ public class DevicePushController {
             @RequestParam(required = true) String clientId,
             @RequestParam(defaultValue = "24") int hours) {
         try {
+            if (!StringUtils.hasText(clientId)) {
+                return Result.fail("设备ID不能为空");
+            }
+            if (hours <= 0 || hours > 720) {
+                return Result.fail("小时数必须在 1-720 之间");
+            }
             Map<String, List<Object>> trend = devicePushService.getTrendData(clientId, hours);
             return Result.success(trend);
         } catch (Exception e) {
-            log.error("获取趋势数据失败", e);
+            log.error("获取趋势数据失败, clientId: {}, hours: {}", clientId, hours, e);
             return Result.fail("获取趋势数据失败: " + e.getMessage());
         }
     }
@@ -241,8 +252,8 @@ public class DevicePushController {
             Map<String, Object> data = devicePushService.getHistoryData(clientId, startTime, endTime, page, size);
             return Result.success(data);
         } catch (Exception e) {
-            log.error("查询失败", e);
-            return Result.fail("查询失败: " + e.getMessage());
+            log.error("获取历史数据失败, clientId: {}, startTime: {}, endTime: {}", clientId, startTime, endTime, e);
+            return Result.fail("获取历史数据失败: " + e.getMessage());
         }
     }
     
@@ -253,6 +264,9 @@ public class DevicePushController {
     @Operation(summary = "获取最新推送数据")
     public Result<DevicePushData> getLatest(@RequestParam String clientId) {
         try {
+            if (!StringUtils.hasText(clientId)) {
+                return Result.fail("设备ID不能为空");
+            }
             DevicePushData data = devicePushService.getLatestData(clientId);
             if (data != null) {
                 return Result.success(data);
@@ -260,8 +274,8 @@ public class DevicePushController {
                 return Result.fail("无数据");
             }
         } catch (Exception e) {
-            log.error("查询失败", e);
-            return Result.fail("查询失败: " + e.getMessage());
+            log.error("获取最新数据失败, clientId: {}", clientId, e);
+            return Result.fail("获取最新数据失败: " + e.getMessage());
         }
     }
     
@@ -276,8 +290,23 @@ public class DevicePushController {
             Map<String, Object> stats = devicePushService.getStatistics(clientId);
             return Result.success(stats);
         } catch (Exception e) {
-            log.error("获取统计失败", e);
-            return Result.fail("获取统计失败: " + e.getMessage());
+            log.error("获取统计数据失败, clientId: {}", clientId, e);
+            return Result.fail("获取统计数据失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 执行历史数据去重
+     */
+    @PostMapping("/deduplicate")
+    @Operation(summary = "历史数据去重")
+    public Result<Map<String, Object>> deduplicate() {
+        try {
+            Map<String, Object> result = devicePushService.deduplicateHistoryData();
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("数据去重失败", e);
+            return Result.fail("数据去重失败: " + e.getMessage());
         }
     }
     

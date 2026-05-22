@@ -3,6 +3,7 @@ package com.weiming.smartag.controller;
 import com.weiming.smartag.common.Result;
 import com.weiming.smartag.service.WeatherService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,6 +13,7 @@ import java.util.Map;
 /**
  * 气象数据控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/weather")
 @RequiredArgsConstructor
@@ -26,7 +28,12 @@ public class WeatherController {
     @GetMapping("/current")
     public Result<Map<String, Object>> getCurrentWeather(
             @RequestParam(required = false) String deviceCode) {
-        return Result.success(weatherService.getCurrentWeather(deviceCode));
+        try {
+            return Result.success(weatherService.getCurrentWeather(deviceCode));
+        } catch (Exception e) {
+            log.error("获取当前天气失败, deviceCode: {}", deviceCode, e);
+            return Result.fail("获取天气失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -37,7 +44,12 @@ public class WeatherController {
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        return Result.success(weatherService.get24HourTrend(deviceCode, startTime, endTime));
+        try {
+            return Result.success(weatherService.get24HourTrend(deviceCode, startTime, endTime));
+        } catch (Exception e) {
+            log.error("获取24小时趋势失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            return Result.fail("获取趋势失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -48,7 +60,12 @@ public class WeatherController {
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        return Result.success(weatherService.get24HourHumidityTrend(deviceCode, startTime, endTime));
+        try {
+            return Result.success(weatherService.get24HourHumidityTrend(deviceCode, startTime, endTime));
+        } catch (Exception e) {
+            log.error("获取24小时湿度趋势失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            return Result.fail("获取趋势失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -59,7 +76,12 @@ public class WeatherController {
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        return Result.success(weatherService.get24HourWindDirectionTrend(deviceCode, startTime, endTime));
+        try {
+            return Result.success(weatherService.get24HourWindDirectionTrend(deviceCode, startTime, endTime));
+        } catch (Exception e) {
+            log.error("获取24小时风向趋势失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            return Result.fail("获取趋势失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -67,7 +89,12 @@ public class WeatherController {
      */
     @GetMapping("/forecast")
     public Result<?> getForecast() {
-        return Result.success(weatherService.getForecast());
+        try {
+            return Result.success(weatherService.getForecast());
+        } catch (Exception e) {
+            log.error("获取天气预报失败", e);
+            return Result.fail("获取预报失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -78,13 +105,18 @@ public class WeatherController {
             @RequestParam(required = false) String deviceCode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        Map<String, Object> all = Map.of(
-                "current", weatherService.getCurrentWeather(deviceCode),
-                "trend", weatherService.get24HourTrend(deviceCode, startTime, endTime),
-                "humidityTrend", weatherService.get24HourHumidityTrend(deviceCode, startTime, endTime),
-                "windDirectionTrend", weatherService.get24HourWindDirectionTrend(deviceCode, startTime, endTime),
-                "forecast", weatherService.getForecast()
-        );
-        return Result.success(all);
+        try {
+            Map<String, Object> all = Map.of(
+                    "current", weatherService.getCurrentWeather(deviceCode),
+                    "trend", weatherService.get24HourTrend(deviceCode, startTime, endTime),
+                    "humidityTrend", weatherService.get24HourHumidityTrend(deviceCode, startTime, endTime),
+                    "windDirectionTrend", weatherService.get24HourWindDirectionTrend(deviceCode, startTime, endTime),
+                    "forecast", weatherService.getForecast()
+            );
+            return Result.success(all);
+        } catch (Exception e) {
+            log.error("获取全部天气数据失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            return Result.fail("获取天气数据失败: " + e.getMessage());
+        }
     }
 }

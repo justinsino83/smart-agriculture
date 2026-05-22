@@ -7,6 +7,7 @@ import com.weiming.smartag.service.IrrigationService;
 import com.weiming.smartag.service.SoilService;
 import com.weiming.smartag.service.StorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -14,6 +15,7 @@ import java.util.*;
 /**
  * 智慧大屏数据控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor
@@ -31,49 +33,54 @@ public class DashboardController {
      */
     @GetMapping("/overview")
     public Result<Map<String, Object>> getOverview() {
-        Map<String, Object> data = new HashMap<>();
-        
-        // 土壤监测统计
-        Map<String, Object> soilStats = soilService.getStatistics();
-        data.put("soil", soilStats);
-        
-        // 灌溉统计
-        Map<String, Object> irrigationStats = irrigationService.getStatistics("day");
-        data.put("irrigation", irrigationStats);
-        
-        // 烘干统计
-        Map<String, Object> dryingStats = dryingService.getStatistics();
-        data.put("drying", dryingStats);
-        
-        // 仓储统计
-        Map<String, Object> storageStats = storageService.getStatistics();
-        data.put("storage", storageStats);
-        
-        // 综合预警
-        List<Map<String, Object>> alerts = new ArrayList<>();
-        
-        // 土壤预警
-        List<Map<String, Object>> soilAlerts = soilService.getAlerts();
-        for (Map<String, Object> alert : soilAlerts) {
-            alert.put("category", "soil");
-            alerts.add(alert);
+        try {
+            Map<String, Object> data = new HashMap<>();
+            
+            // 土壤监测统计
+            Map<String, Object> soilStats = soilService.getStatistics();
+            data.put("soil", soilStats);
+            
+            // 灌溉统计
+            Map<String, Object> irrigationStats = irrigationService.getStatistics("day");
+            data.put("irrigation", irrigationStats);
+            
+            // 烘干统计
+            Map<String, Object> dryingStats = dryingService.getStatistics();
+            data.put("drying", dryingStats);
+            
+            // 仓储统计
+            Map<String, Object> storageStats = storageService.getStatistics();
+            data.put("storage", storageStats);
+            
+            // 综合预警
+            List<Map<String, Object>> alerts = new ArrayList<>();
+            
+            // 土壤预警
+            List<Map<String, Object>> soilAlerts = soilService.getAlerts();
+            for (Map<String, Object> alert : soilAlerts) {
+                alert.put("category", "soil");
+                alerts.add(alert);
+            }
+            
+            // 仓储预警
+            long storageWarnings = ((Number) storageStats.getOrDefault("warningCount", 0)).longValue();
+            if (storageWarnings > 0) {
+                Map<String, Object> alert = new HashMap<>();
+                alert.put("category", "storage");
+                alert.put("type", "longStorage");
+                alert.put("level", "warning");
+                alert.put("message", storageWarnings + "批次粮食存储超过90天");
+                alerts.add(alert);
+            }
+            
+            data.put("alerts", alerts);
+            data.put("alertCount", alerts.size());
+            
+            return Result.success(data);
+        } catch (Exception e) {
+            log.error("获取大屏综合数据失败", e);
+            return Result.fail("获取数据失败: " + e.getMessage());
         }
-        
-        // 仓储预警
-        long storageWarnings = ((Number) storageStats.getOrDefault("warningCount", 0)).longValue();
-        if (storageWarnings > 0) {
-            Map<String, Object> alert = new HashMap<>();
-            alert.put("category", "storage");
-            alert.put("type", "longStorage");
-            alert.put("level", "warning");
-            alert.put("message", storageWarnings + "批次粮食存储超过90天");
-            alerts.add(alert);
-        }
-        
-        data.put("alerts", alerts);
-        data.put("alertCount", alerts.size());
-        
-        return Result.success(data);
     }
     
     /**
