@@ -17,6 +17,9 @@ public class InsectData {
     @TableId(type = IdType.AUTO)
     private Long id;
     
+    /** 设施ID */
+    private Long facilityId;
+    
     /** 设备IMEI编号 */
     private String imei;
     

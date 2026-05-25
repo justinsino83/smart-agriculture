@@ -17,6 +17,9 @@ public class WeatherData {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 设施ID */
+    private Long facilityId;
+
     private Long soilId;
 
     private Double temperature;

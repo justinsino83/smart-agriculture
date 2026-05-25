@@ -14,6 +14,9 @@ public class SoilData {
     @TableId(type = IdType.AUTO)
     private Long id;
     
+    /** 设施ID */
+    private Long facilityId;
+    
     /** 传感器ID */
     private Long sensorId;
     

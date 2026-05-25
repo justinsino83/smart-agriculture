@@ -381,31 +381,31 @@ public class DevicePushServiceImpl extends ServiceImpl<DevicePushDataMapper, Dev
     }
 
     @Override
-    public Map<String, Object> getDashboardOverview() {
+    public Map<String, Object> getDashboardOverview(String clientId) {
         Map<String, Object> overview = new HashMap<>();
         
-        // 1. 获取综合统计
-        Map<String, Object> stats = getStatistics(null);
+        // 1. 获取综合统计（支持按设备过滤）
+        Map<String, Object> stats = getStatistics(clientId);
         overview.putAll(stats);
         
-        // 2. 获取所有设备最新数据用于展示
-        List<Map<String, Object>> activeDevices = getActiveDevices();
+        // 2. 获取设备最新数据（支持按设备过滤）
+        List<Map<String, Object>> activeDevices = getActiveDevicesWithFilter(clientId);
         overview.put("devices", activeDevices);
         
-        // 3. 获取最新环境数据（取所有设备的平均值）
-        Map<String, Object> envData = getAverageEnvironmentData();
+        // 3. 获取最新环境数据（支持按设备过滤）
+        Map<String, Object> envData = getAverageEnvironmentDataWithFilter(clientId);
         overview.put("environment", envData);
         
-        // 4. 获取设备状态分布
-        Map<String, Object> statusDistribution = getDeviceStatusDistribution();
+        // 4. 获取设备状态分布（支持按设备过滤）
+        Map<String, Object> statusDistribution = getDeviceStatusDistributionWithFilter(clientId);
         overview.put("statusDistribution", statusDistribution);
         
-        // 5. 获取告警信息
-        List<Map<String, Object>> alerts = generateAlerts();
+        // 5. 获取告警信息（支持按设备过滤）
+        List<Map<String, Object>> alerts = generateAlertsWithFilter(clientId);
         overview.put("alerts", alerts);
         
-        // 6. 获取最新一条设备数据作为示例展示
-        DevicePushData latestRecord = getLatestRecord();
+        // 6. 获取最新一条设备数据作为示例展示（支持按设备过滤）
+        DevicePushData latestRecord = getLatestRecordWithFilter(clientId);
         overview.put("latestRecord", latestRecord);
         
         return overview;
@@ -786,5 +786,247 @@ public class DevicePushServiceImpl extends ServiceImpl<DevicePushDataMapper, Dev
     
     private void appendValue(StringBuilder sb, Object value) {
         sb.append(value == null ? "NULL" : value.toString()).append("|");
+    }
+    
+    /**
+     * 获取活跃设备列表（支持按设备过滤）
+     */
+    private List<Map<String, Object>> getActiveDevicesWithFilter(String clientId) {
+        LocalDateTime activeTime = LocalDateTime.now().minusHours(24);
+        
+        // 1. 先获取所有在活跃时间内有数据的设备ID
+        LambdaQueryWrapper<DevicePushData> clientWrapper = new LambdaQueryWrapper<>();
+        clientWrapper.ge(DevicePushData::getCreateTime, activeTime)
+                     .select(DevicePushData::getClientId)
+                     .groupBy(DevicePushData::getClientId);
+        
+        // 如果指定了clientId，只查指定设备
+        if (StringUtils.hasText(clientId)) {
+            clientWrapper.eq(DevicePushData::getClientId, clientId);
+        }
+        
+        List<DevicePushData> clientIds = list(clientWrapper);
+        
+        // 2. 对每个设备分别获取其最新的数据
+        List<Map<String, Object>> devices = new ArrayList<>();
+        for (DevicePushData clientData : clientIds) {
+            String cId = clientData.getClientId();
+            DevicePushData latestData = getLatestData(cId);
+            
+            if (latestData != null) {
+                Map<String, Object> device = new HashMap<>();
+                device.put("clientId", cId);
+                device.put("detectedTime", latestData.getDetectedTime());
+                device.put("lastSeen", latestData.getCreateTime());
+                device.put("rssi", latestData.getRssi());
+                device.put("latitude", latestData.getLatitude());
+                device.put("longitude", latestData.getLongitude());
+                device.put("voltage", latestData.getVoltage());
+                device.put("status", "online");
+                // 环境数据
+                device.put("ambientTemperature", latestData.getAmbientTemperature());
+                device.put("ambientHumidity", latestData.getAmbientHumidity());
+                device.put("pressure", latestData.getPressure());
+                device.put("windSpeed", latestData.getWindSpeed());
+                device.put("windDirection", latestData.getWindDirection());
+                device.put("rainfall", latestData.getRainfall());
+                device.put("lightIntensity", latestData.getLightIntensity());
+                device.put("dewTemp", latestData.getDewTemp());
+                // 土壤数据
+                device.put("soilTemp", latestData.getSoilTemp());
+                device.put("soilHumi", latestData.getSoilHumi());
+                device.put("soilCond", latestData.getSoilCond());
+                device.put("soilPh", latestData.getSoilPh());
+                // 其他数据
+                device.put("co2", latestData.getCo2());
+                devices.add(device);
+            }
+        }
+        
+        return devices;
+    }
+    
+    /**
+     * 获取平均环境数据（支持按设备过滤）
+     */
+    private Map<String, Object> getAverageEnvironmentDataWithFilter(String clientId) {
+        Map<String, Object> result = new HashMap<>();
+        
+        LambdaQueryWrapper<DevicePushData> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ge(DevicePushData::getCreateTime, LocalDateTime.now().minusHours(1))
+               .orderByDesc(DevicePushData::getCreateTime)
+               .last("LIMIT 100");
+        
+        // 如果指定了clientId，只查指定设备
+        if (StringUtils.hasText(clientId)) {
+            wrapper.eq(DevicePushData::getClientId, clientId);
+        }
+        
+        List<DevicePushData> recentData = list(wrapper);
+        
+        if (recentData.isEmpty()) {
+            return result;
+        }
+        
+        BigDecimal tempSum = BigDecimal.ZERO;
+        BigDecimal humiSum = BigDecimal.ZERO;
+        BigDecimal soilPhSum = BigDecimal.ZERO;
+        BigDecimal soilCondSum = BigDecimal.ZERO;
+        BigDecimal lightSum = BigDecimal.ZERO;
+        BigDecimal co2Sum = BigDecimal.ZERO;
+        int count = 0;
+        
+        for (DevicePushData data : recentData) {
+            if (data.getAmbientTemperature() != null) {
+                tempSum = tempSum.add(data.getAmbientTemperature());
+            }
+            if (data.getAmbientHumidity() != null) {
+                humiSum = humiSum.add(data.getAmbientHumidity());
+            }
+            if (data.getSoilPh() != null) {
+                soilPhSum = soilPhSum.add(data.getSoilPh());
+            }
+            if (data.getSoilCond() != null) {
+                soilCondSum = soilCondSum.add(data.getSoilCond());
+            }
+            if (data.getLightIntensity() != null) {
+                lightSum = lightSum.add(data.getLightIntensity());
+            }
+            if (data.getCo2() != null) {
+                co2Sum = co2Sum.add(data.getCo2());
+            }
+            count++;
+        }
+        
+        if (count > 0) {
+            result.put("avgTemperature", tempSum.divide(BigDecimal.valueOf(count), 1, RoundingMode.HALF_UP));
+            result.put("avgHumidity", humiSum.divide(BigDecimal.valueOf(count), 1, RoundingMode.HALF_UP));
+            result.put("avgSoilPH", soilPhSum.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP));
+            result.put("avgSoilEC", soilCondSum.divide(BigDecimal.valueOf(count * 1000), 3, RoundingMode.HALF_UP));
+            result.put("avgLight", lightSum.divide(BigDecimal.valueOf(count), 0, RoundingMode.HALF_UP));
+            result.put("avgCO2", co2Sum.divide(BigDecimal.valueOf(count), 0, RoundingMode.HALF_UP));
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 获取设备状态分布（支持按设备过滤）
+     */
+    private Map<String, Object> getDeviceStatusDistributionWithFilter(String clientId) {
+        Map<String, Object> dist = new HashMap<>();
+        
+        List<Map<String, Object>> devices = getActiveDevicesWithFilter(clientId);
+        int total = devices.size();
+        int online = 0;
+        int warning = 0;
+        
+        for (Map<String, Object> device : devices) {
+            Object rssi = device.get("rssi");
+            if (rssi instanceof Number) {
+                int signal = ((Number) rssi).intValue();
+                if (signal > -60) {
+                    online++;
+                } else if (signal > -80) {
+                    warning++;
+                }
+            }
+        }
+        
+        dist.put("online", online);
+        dist.put("warning", warning);
+        dist.put("offline", Math.max(0, total - online - warning));
+        dist.put("total", total);
+        
+        return dist;
+    }
+    
+    /**
+     * 生成告警信息（支持按设备过滤）
+     */
+    private List<Map<String, Object>> generateAlertsWithFilter(String clientId) {
+        List<Map<String, Object>> alerts = new ArrayList<>();
+        
+        LocalDateTime checkTime = LocalDateTime.now().minusHours(1);
+        
+        LambdaQueryWrapper<DevicePushData> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ge(DevicePushData::getCreateTime, checkTime);
+        
+        // 如果指定了clientId，只查指定设备
+        if (StringUtils.hasText(clientId)) {
+            wrapper.eq(DevicePushData::getClientId, clientId);
+        }
+        
+        List<DevicePushData> recentData = list(wrapper);
+        
+        for (DevicePushData data : recentData) {
+            // 检查RSSI过低
+            if (data.getRssi() != null && data.getRssi() < -80) {
+                Map<String, Object> alert = new HashMap<>();
+                alert.put("clientId", data.getClientId());
+                alert.put("type", "rssi");
+                alert.put("level", "warning");
+                alert.put("message", "信号弱: " + data.getRssi() + " dBm");
+                alert.put("time", data.getCreateTime());
+                alerts.add(alert);
+            }
+            
+            // 检查温度异常
+            if (data.getAmbientTemperature() != null && 
+                (data.getAmbientTemperature().compareTo(new BigDecimal("40")) > 0 || 
+                 data.getAmbientTemperature().compareTo(new BigDecimal("0")) < 0)) {
+                Map<String, Object> alert = new HashMap<>();
+                alert.put("clientId", data.getClientId());
+                alert.put("type", "temperature");
+                alert.put("level", "warning");
+                alert.put("message", "温度异常: " + data.getAmbientTemperature() + "℃");
+                alert.put("time", data.getCreateTime());
+                alerts.add(alert);
+            }
+            
+            // 检查湿度异常
+            if (data.getAmbientHumidity() != null && 
+                (data.getAmbientHumidity().compareTo(new BigDecimal("90")) > 0 || 
+                 data.getAmbientHumidity().compareTo(new BigDecimal("10")) < 0)) {
+                Map<String, Object> alert = new HashMap<>();
+                alert.put("clientId", data.getClientId());
+                alert.put("type", "humidity");
+                alert.put("level", "warning");
+                alert.put("message", "湿度异常: " + data.getAmbientHumidity() + "%");
+                alert.put("time", data.getCreateTime());
+                alerts.add(alert);
+            }
+            
+            // 检查土壤pH异常
+            if (data.getSoilPh() != null && 
+                (data.getSoilPh().compareTo(new BigDecimal("8")) > 0 || 
+                 data.getSoilPh().compareTo(new BigDecimal("5")) < 0)) {
+                Map<String, Object> alert = new HashMap<>();
+                alert.put("clientId", data.getClientId());
+                alert.put("type", "soilPh");
+                alert.put("level", "warning");
+                alert.put("message", "土壤pH异常: " + data.getSoilPh());
+                alert.put("time", data.getCreateTime());
+                alerts.add(alert);
+            }
+        }
+        
+        return alerts;
+    }
+    
+    /**
+     * 获取最近一条记录（支持按设备过滤）
+     */
+    private DevicePushData getLatestRecordWithFilter(String clientId) {
+        LambdaQueryWrapper<DevicePushData> wrapper = new LambdaQueryWrapper<>();
+        wrapper.orderByDesc(DevicePushData::getCreateTime)
+               .last("LIMIT 1");
+        
+        // 如果指定了clientId，只查指定设备
+        if (StringUtils.hasText(clientId)) {
+            wrapper.eq(DevicePushData::getClientId, clientId);
+        }
+        
+        return getOne(wrapper);
     }
 }

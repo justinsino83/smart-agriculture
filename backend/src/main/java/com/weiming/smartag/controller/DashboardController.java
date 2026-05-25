@@ -115,14 +115,15 @@ public class DashboardController {
     
     /**
      * 获取实时环境数据（从设备推送数据获取）
+     * 支持按设备过滤
      */
     @GetMapping("/realtime")
-    public Result<Map<String, Object>> getRealtimeData() {
+    public Result<Map<String, Object>> getRealtimeData(@RequestParam(required = false) String clientId) {
         Map<String, Object> data = new HashMap<>();
         
         try {
-            // 获取仪表盘综合数据
-            Map<String, Object> overview = devicePushService.getDashboardOverview();
+            // 获取仪表盘综合数据（支持按设备过滤）
+            Map<String, Object> overview = devicePushService.getDashboardOverview(clientId);
             
             // 提取环境数据
             Map<String, Object> environment = (Map<String, Object>) overview.get("environment");
@@ -135,6 +136,7 @@ public class DashboardController {
             
             return Result.success(data);
         } catch (Exception e) {
+            log.error("获取实时数据失败, clientId:{}", clientId, e);
             // 降级到模拟数据
             data.put("temperature", 24.5 + Math.random());
             data.put("humidity", 65.0 + Math.random() * 5);
@@ -155,7 +157,7 @@ public class DashboardController {
         
         // 从设备推送服务获取数据
         try {
-            Map<String, Object> deviceData = devicePushService.getDashboardOverview();
+            Map<String, Object> deviceData = devicePushService.getDashboardOverview(null);
             result.put("deviceData", deviceData);
         } catch (Exception e) {
             result.put("deviceData", Collections.emptyMap());

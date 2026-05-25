@@ -52,4 +52,9 @@ public interface SoilService extends IService<SoilSensor> {
      * 获取灌溉建议
      */
     List<Map<String, Object>> getIrrigationRecommendations();
+    
+    /**
+     * 获取所有传感器列表，包含实时数据
+     */
+    List<Map<String, Object>> listSensorsWithRealTimeData();
 }

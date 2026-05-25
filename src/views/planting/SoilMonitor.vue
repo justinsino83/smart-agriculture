@@ -39,16 +39,17 @@
       <div class="gauge-grid">
         <div v-for="item in gaugeData" :key="item.name" class="gauge-item">
           <div class="gauge-chart">
-            <div class="gauge-value" :style="{ color: item.color }">
-              {{ item.value }}
-              <span class="gauge-unit">{{ item.unit }}</span>
-            </div>            
+            <div class="gauge-value-container">
+              <div class="gauge-value" :style="{ color: item.color }">{{ item.value }}</div>
+              <div class="gauge-unit">{{ item.unit }}</div>
+            </div>
             <el-progress
               type="dashboard"
               :percentage="item.percentage"
               :color="item.color"
               :stroke-width="10"
               :width="140"
+              :show-text="false"
             />
           </div>          
           <div class="gauge-info">
@@ -56,7 +57,7 @@
             <div class="gauge-range">
               适宜范围: {{ item.min }}-{{ item.max }}{{ item.unit }}
             </div>            
-            <el-tag :type="item.status" size="small">
+            <el-tag :type="getTagType(item.status)" size="small">
               {{ item.statusText }}
             </el-tag>
           </div>
@@ -217,8 +218,8 @@ const gaugeData = reactive([
     value: 0,
     unit: 'mg/kg',
     percentage: 0,
-    min: 30,
-    max: 100,
+    min: 80,
+    max: 200,
     color: '#52c41a',
     status: 'success',
     statusText: '适宜'
@@ -404,22 +405,64 @@ async function loadSensors() {
   }
 }
 
+function updateGaugeStatus(index, value) {
+  const gauge = gaugeData[index]
+  if (value < gauge.min) {
+    gauge.status = 'warning'
+    gauge.statusText = '偏低'
+    gauge.color = '#faad14'
+  } else if (value > gauge.max) {
+    gauge.status = 'danger'
+    gauge.statusText = '过高'
+    gauge.color = '#f5222d'
+  } else {
+    gauge.status = 'success'
+    gauge.statusText = '适宜'
+    gauge.color = '#52c41a'
+  }
+}
+
+// 转换状态为 el-tag 可用的类型
+function getTagType(status) {
+  if (status === 'danger') return 'error'
+  return status
+}
+
 async function loadOverview() {
   if (!selectedSensor.value) return
   loading.value = true
   try {
     const realtime = await soilApi.getRealTimeData(selectedSensor.value)
     if (realtime) {
+      // 更新湿度
       gaugeData[0].value = realtime.moisture ?? 0
-      gaugeData[0].percentage = realtime.moisture ?? 0
+      gaugeData[0].percentage = Math.round(realtime.moisture ?? 0)
+      updateGaugeStatus(0, realtime.moisture ?? 0)
+
+      // 更新温度
       gaugeData[1].value = realtime.temperature ?? 0
-      gaugeData[1].percentage = Math.round((realtime.temperature ?? 0) / 40 * 100)
+      gaugeData[1].percentage = Math.round(((realtime.temperature ?? 0) / 40) * 100)
+      updateGaugeStatus(1, realtime.temperature ?? 0)
+
+      // 更新pH
       gaugeData[2].value = realtime.ph ?? 0
-      gaugeData[2].percentage = Math.round((realtime.ph ?? 0) / 10 * 100)
+      gaugeData[2].percentage = Math.round(((realtime.ph ?? 0) / 10) * 100)
+      updateGaugeStatus(2, realtime.ph ?? 0)
+
+      // 更新EC
       gaugeData[3].value = realtime.ec ?? 0
-      gaugeData[3].percentage = Math.round((realtime.ec ?? 0) / 3 * 100)
+      gaugeData[3].percentage = Math.round(((realtime.ec ?? 0) / 3) * 100)
+      updateGaugeStatus(3, realtime.ec ?? 0)
+
+      // 更新氮含量
       gaugeData[4].value = realtime.nitrogen ?? 0
+      gaugeData[4].percentage = Math.round(((realtime.nitrogen ?? 0) / 150) * 100)
+      updateGaugeStatus(4, realtime.nitrogen ?? 0)
+
+      // 更新磷钾含量
       gaugeData[5].value = (realtime.phosphorus ?? 0) + (realtime.potassium ?? 0)
+      gaugeData[5].percentage = Math.round((((realtime.phosphorus ?? 0) + (realtime.potassium ?? 0)) / 200) * 100)
+      updateGaugeStatus(5, (realtime.phosphorus ?? 0) + (realtime.potassium ?? 0))
 
       updateTime.value = realtime.collectTime
         ? realtime.collectTime.replace('T', ' ').substring(0, 19)
@@ -634,19 +677,30 @@ watch(selectedSensor, () => {
   display: inline-block;
 }
 
-.gauge-value {
+.gauge-value-container {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  z-index: 10;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.gauge-value {
   font-size: 24px;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .gauge-unit {
   font-size: 12px;
   font-weight: 400;
-  margin-left: 2px;
+  color: #8c8c8c;
+  margin-top: 2px;
 }
 
 .gauge-info {

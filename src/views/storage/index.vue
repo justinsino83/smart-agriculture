@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="header-left">
         <h2>智慧仓储</h2>
-        <el-tag type="info">总库存: {{ totalStock }} 吨</el-tag>
+        <el-tag type="info">总库存: {{ formatNumber(totalStock) }} 吨</el-tag>
       </div>
       
       <div class="header-actions">
@@ -18,7 +18,7 @@
         <div class="stat-card">
           <div class="stat-icon yellow"><el-icon><Box /></el-icon></div>
           <div class="stat-content">
-            <div class="stat-value">{{ totalStock }}<span class="unit">吨</span></div>
+            <div class="stat-value">{{ formatNumber(totalStock) }}<span class="unit">吨</span></div>
             <div class="stat-label">当前库存</div>
           </div>
         </div>
@@ -26,7 +26,7 @@
         <div class="stat-card">
           <div class="stat-icon blue"><el-icon><ArrowDown /></el-icon></div>
           <div class="stat-content">
-            <div class="stat-value">{{ todayIn }}<span class="unit">吨</span></div>
+            <div class="stat-value">{{ formatNumber(todayIn) }}<span class="unit">吨</span></div>
             <div class="stat-label">今日入库</div>
           </div>
         </div>
@@ -34,7 +34,7 @@
         <div class="stat-card">
           <div class="stat-icon green"><el-icon><ArrowUp /></el-icon></div>
           <div class="stat-content">
-            <div class="stat-value">{{ todayOut }}<span class="unit">吨</span></div>
+            <div class="stat-value">{{ formatNumber(todayOut) }}<span class="unit">吨</span></div>
             <div class="stat-label">今日出库</div>
           </div>
         </div>
@@ -66,8 +66,8 @@
         <div class="card-body">
           <el-table :data="filteredStockList" stripe style="width: 100%" height="calc(100vh - 400px)">
             <el-table-column prop="grainType" label="粮食品种" width="120" />
-            <el-table-column prop="batchNo" label="批次号" width="160" />
-            <el-table-column prop="warehouse" label="仓库位置" width="150" />
+            <el-table-column prop="batchNo" label="批次号" min-width="160" />
+            <el-table-column prop="warehouse" label="仓库位置" min-width="150" />
             <el-table-column prop="quantity" label="数量(吨)" width="120">
               <template #default="{ row }">
                 <span :class="{ 'text-warning': row.quantity < 10 }">{{ row.quantity }}</span>
@@ -79,8 +79,8 @@
                 <el-tag :type="row.quality === '一等' ? 'success' : 'info'">{{ row.quality }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="entryDate" label="入库日期" width="120" />
-            <el-table-column prop="expireDate" label="保质期限" width="120">
+            <el-table-column prop="entryDate" label="入库日期" width="180" />
+            <el-table-column prop="expireDate" label="保质期限" min-width="180">
               <template #default="{ row }">
                 <span :class="{ 'text-danger': isNearExpire(row.expireDate) }">{{ row.expireDate }}</span>
               </template>
@@ -100,6 +100,8 @@
               :total="total"
               :page-sizes="[10, 20, 50]"
               layout="total, sizes, prev, pager, next"
+              @size-change="handlePageChange"
+              @current-change="handlePageChange"
             />
           </div>
         </div>
@@ -178,23 +180,12 @@ const showDetailDialog = ref(false)
 const selectedItem = ref(null)
 const loading = ref(false)
 
-// 默认演示数据
-const defaultTotalStock = 2560
-const defaultTodayIn = 120
-const defaultTodayOut = 80
-const defaultWarningCount = 3
-const defaultStockList = [
-  { grainType: '水稻', batchNo: 'SD20240320001', warehouse: '1号仓库-A区', quantity: 120, moisture: 13.5, quality: '一等', entryDate: '2024-03-20', expireDate: '2024-09-20' },
-  { grainType: '小麦', batchNo: 'XM20240319002', warehouse: '1号仓库-B区', quantity: 80, moisture: 12.8, quality: '一等', entryDate: '2024-03-19', expireDate: '2024-09-19' },
-  { grainType: '玉米', batchNo: 'YM20240318003', warehouse: '2号仓库', quantity: 5, moisture: 14.2, quality: '二等', entryDate: '2024-03-18', expireDate: '2024-04-18' }
-]
+const totalStock = ref(0)
+const todayIn = ref(0)
+const todayOut = ref(0)
+const warningCount = ref(0)
 
-const totalStock = ref(defaultTotalStock)
-const todayIn = ref(defaultTodayIn)
-const todayOut = ref(defaultTodayOut)
-const warningCount = ref(defaultWarningCount)
-
-const stockList = ref([...defaultStockList])
+const stockList = ref([])
 
 const inForm = ref({
   grainType: '',
@@ -202,6 +193,27 @@ const inForm = ref({
   warehouse: '',
   moisture: 13.5
 })
+
+// 将后端数据转换为前端需要的格式
+const formatStockItem = (item) => {
+  // 质量等级转换
+  let qualityText = '一等';
+  if (item.quality === 2) qualityText = '二等';
+  else if (item.quality === 3) qualityText = '三等';
+  else if (typeof item.quality === 'string') qualityText = item.quality;
+  
+  return {
+    id: item.id,
+    grainType: item.grainType || '未知',
+    batchNo: item.batchNo || '',
+    warehouse: item.warehouse || '未分配',
+    quantity: item.quantity || item.weight || 0,
+    moisture: item.moisture || 0,
+    quality: qualityText,
+    entryDate: item.entryDate ? item.entryDate.toString().replace('T', ' ').substring(0, 10) : '',
+    expireDate: item.expireDate ? item.expireDate.toString().replace('T', ' ').substring(0, 10) : ''
+  };
+};
 
 const filteredStockList = computed(() => {
   if (!searchKeyword.value) return stockList.value
@@ -234,6 +246,19 @@ const saveIn = () => {
   loadStorageData()
 }
 
+const handlePageChange = () => {
+  loadStorageData()
+}
+
+// 格式化大数字显示
+const formatNumber = (num) => {
+  if (!num) return '0'
+  if (num >= 10000) {
+    return (num / 10000).toFixed(2) + '万'
+  }
+  return num.toLocaleString()
+}
+
 const loadStorageData = async () => {
   loading.value = true
   try {
@@ -241,34 +266,22 @@ const loadStorageData = async () => {
       storageApi.getStockList({ page: currentPage.value, size: pageSize.value }),
       storageApi.getOverview()
     ])
+    
     if (stockData) {
       const data = stockData.list || stockData.records || []
-      stockList.value = data.length > 0 ? data : [...defaultStockList]
+      stockList.value = data.map(formatStockItem)
       total.value = stockData.total || stockList.value.length
-    } else {
-      stockList.value = [...defaultStockList]
-      total.value = defaultStockList.length
     }
+    
     if (overviewData) {
-      totalStock.value = overviewData.totalStock || defaultTotalStock
-      todayIn.value = overviewData.todayIn || defaultTodayIn
-      todayOut.value = overviewData.todayOut || defaultTodayOut
-      warningCount.value = overviewData.warningCount || defaultWarningCount
-    } else {
-      totalStock.value = defaultTotalStock
-      todayIn.value = defaultTodayIn
-      todayOut.value = defaultTodayOut
-      warningCount.value = defaultWarningCount
+      totalStock.value = overviewData.totalStock || 0
+      todayIn.value = overviewData.todayIn || 0
+      todayOut.value = overviewData.todayOut || 0
+      warningCount.value = overviewData.warningCount || 0
     }
   } catch (error) {
     console.error('加载仓储数据失败:', error)
-    // 保持默认数据
-    stockList.value = [...defaultStockList]
-    total.value = defaultStockList.length
-    totalStock.value = defaultTotalStock
-    todayIn.value = defaultTodayIn
-    todayOut.value = defaultTodayOut
-    warningCount.value = defaultWarningCount
+    ElMessage.error('加载仓储数据失败，请检查后端服务')
   } finally {
     loading.value = false
   }

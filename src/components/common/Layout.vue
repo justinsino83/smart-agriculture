@@ -121,9 +121,8 @@ const menuRoutes = [
     path: '/system',
     meta: { title: '系统管理', icon: 'Setting' },
     children: [
-      { path: '/system/users', meta: { title: '用户管理' } },
       { path: '/system/devices', meta: { title: '设备管理' } },
-      { path: '/system/alerts', meta: { title: '告警中心' } }
+      { path: '/system/users', meta: { title: '用户管理' } }
     ]
   }
 ]

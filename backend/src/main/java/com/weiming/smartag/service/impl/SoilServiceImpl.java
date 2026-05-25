@@ -7,6 +7,7 @@ import com.weiming.smartag.mapper.SoilSensorMapper;
 import com.weiming.smartag.mapper.SoilDataMapper;
 import com.weiming.smartag.service.SoilService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 /**
  * 土壤监测服务实现
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SoilServiceImpl extends ServiceImpl<SoilSensorMapper, SoilSensor> implements SoilService {
@@ -277,5 +279,52 @@ public class SoilServiceImpl extends ServiceImpl<SoilSensorMapper, SoilSensor> i
         if (moisture < 20) return 30;
         if (moisture < 30) return 20;
         return 15;
+    }
+    
+    @Override
+    public List<Map<String, Object>> listSensorsWithRealTimeData() {
+        List<SoilSensor> sensors = list();
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        for (SoilSensor sensor : sensors) {
+            Map<String, Object> sensorMap = new HashMap<>();
+            // 添加传感器基本信息
+            sensorMap.put("id", sensor.getId());
+            sensorMap.put("deviceCode", sensor.getDeviceCode());
+            sensorMap.put("deviceName", sensor.getDeviceName());
+            sensorMap.put("fieldId", sensor.getFieldId());
+            sensorMap.put("status", sensor.getStatus());
+            sensorMap.put("location", sensor.getLocation());
+            sensorMap.put("lastReportTime", sensor.getLastReportTime());
+            sensorMap.put("createTime", sensor.getCreateTime());
+            
+            // 获取并添加实时数据
+            try {
+                SoilData realTimeData = getRealTimeData(sensor.getId());
+                if (realTimeData != null) {
+                    Map<String, Object> realTimeMap = new HashMap<>();
+                    realTimeMap.put("moisture", realTimeData.getMoisture());
+                    realTimeMap.put("temperature", realTimeData.getTemperature());
+                    realTimeMap.put("ph", realTimeData.getPh());
+                    realTimeMap.put("ec", realTimeData.getEc());
+                    realTimeMap.put("nitrogen", realTimeData.getNitrogen());
+                    realTimeMap.put("phosphorus", realTimeData.getPhosphorus());
+                    realTimeMap.put("potassium", realTimeData.getPotassium());
+                    realTimeMap.put("collectTime", realTimeData.getCollectTime());
+                    sensorMap.put("realTimeData", realTimeMap);
+                } else {
+                    // 实时数据为空时设置null
+                    sensorMap.put("realTimeData", null);
+                }
+            } catch (Exception e) {
+                // 获取实时数据失败时记录日志但不影响整个接口
+                log.error("获取传感器实时数据失败, sensorId: {}", sensor.getId(), e);
+                sensorMap.put("realTimeData", null);
+            }
+            
+            result.add(sensorMap);
+        }
+        
+        return result;
     }
 }

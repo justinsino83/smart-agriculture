@@ -1,30 +1,39 @@
 package com.weiming.smartag.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.weiming.smartag.common.Result;
 import com.weiming.smartag.entity.DryingBatch;
+import com.weiming.smartag.entity.Facility;
+import com.weiming.smartag.entity.FacilityRealtimeData;
+import com.weiming.smartag.entity.FacilityStatus;
+import com.weiming.smartag.mapper.FacilityRealtimeDataMapper;
+import com.weiming.smartag.mapper.FacilityStatusMapper;
+import com.weiming.smartag.service.DevicePushService;
 import com.weiming.smartag.service.DryingService;
+import com.weiming.smartag.service.FacilityService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-/**
- * 烘干管理控制器
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/drying")
 @RequiredArgsConstructor
 @CrossOrigin
+@Tag(name = "烘干车间管理", description = "烘干车间数据管理接口")
 public class DryingController {
-    
+
     private final DryingService dryingService;
-    
-    /**
-     * 获取所有烘干批次
-     */
+    private final DevicePushService devicePushService;
+    private final FacilityService facilityService;
+    private final FacilityRealtimeDataMapper facilityRealtimeDataMapper;
+    private final FacilityStatusMapper facilityStatusMapper;
+
     @GetMapping("/batches")
     public Result<List<DryingBatch>> listBatches() {
         try {
@@ -34,10 +43,7 @@ public class DryingController {
             return Result.fail("获取批次列表失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 获取最近批次
-     */
+
     @GetMapping("/batches/recent")
     public Result<List<Map<String, Object>>> getRecentBatches(
             @RequestParam(defaultValue = "10") int limit) {
@@ -51,10 +57,7 @@ public class DryingController {
             return Result.fail("获取批次失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 获取批次详情
-     */
+
     @GetMapping("/batch/{batchId}")
     public Result<DryingBatch> getBatch(@PathVariable Long batchId) {
         try {
@@ -67,10 +70,7 @@ public class DryingController {
             return Result.fail("获取批次详情失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 创建烘干批次
-     */
+
     @PostMapping("/batch")
     public Result<?> createBatch(@RequestBody DryingBatch batch) {
         try {
@@ -84,10 +84,7 @@ public class DryingController {
             return Result.fail("创建批次失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 开始烘干
-     */
+
     @PostMapping("/batch/{batchId}/start")
     public Result<?> startBatch(@PathVariable Long batchId) {
         try {
@@ -101,10 +98,7 @@ public class DryingController {
             return Result.fail("启动批次失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 暂停烘干
-     */
+
     @PostMapping("/batch/{batchId}/pause")
     public Result<?> pauseBatch(@PathVariable Long batchId) {
         try {
@@ -118,10 +112,7 @@ public class DryingController {
             return Result.fail("暂停批次失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 恢复烘干
-     */
+
     @PostMapping("/batch/{batchId}/resume")
     public Result<?> resumeBatch(@PathVariable Long batchId) {
         try {
@@ -135,10 +126,7 @@ public class DryingController {
             return Result.fail("恢复批次失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 停止烘干
-     */
+
     @PostMapping("/batch/{batchId}/stop")
     public Result<?> stopBatch(@PathVariable Long batchId) {
         try {
@@ -152,10 +140,7 @@ public class DryingController {
             return Result.fail("停止批次失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 获取工艺曲线数据
-     */
+
     @GetMapping("/batch/{batchId}/curve")
     public Result<Map<String, Object>> getCurveData(@PathVariable Long batchId) {
         try {
@@ -168,10 +153,7 @@ public class DryingController {
             return Result.fail("获取曲线数据失败: " + e.getMessage());
         }
     }
-    
-    /**
-     * 获取统计信息
-     */
+
     @GetMapping("/statistics")
     public Result<Map<String, Object>> getStatistics() {
         try {
@@ -179,6 +161,115 @@ public class DryingController {
         } catch (Exception e) {
             log.error("获取烘干统计失败", e);
             return Result.fail("获取统计失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/sensors")
+    @Operation(summary = "获取烘干车间传感器数据", description = "获取烘干车间的环境监测、设备状态、能耗数据等综合数据")
+    public Result<Map<String, Object>> getDryingSensors(
+            @Parameter(description = "设施ID")
+            @RequestParam(required = false) Long facilityId) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+
+            // 获取设施信息
+            Facility facility = null;
+            if (facilityId != null) {
+                facility = facilityService.getById(facilityId);
+            }
+            if (facility == null) {
+                facility = facilityService.lambdaQuery()
+                        .eq(Facility::getType, 3)
+                        .last("LIMIT 1")
+                        .one();
+            }
+            result.put("facility", facility);
+
+            if (facility != null) {
+                // 环境数据
+                Map<String, Object> envData = devicePushService.getDashboardOverview(null);
+                result.put("environment", envData.get("environment"));
+
+                // 实时传感器数据 - 从数据库读取
+                FacilityRealtimeData realtimeData = facilityRealtimeDataMapper.selectOne(
+                        new LambdaQueryWrapper<FacilityRealtimeData>()
+                                .eq(FacilityRealtimeData::getFacilityId, facility.getId())
+                                .orderByDesc(FacilityRealtimeData::getCollectTime)
+                                .last("LIMIT 1")
+                );
+                if (realtimeData != null) {
+                    Map<String, Object> realtimeSensor = new HashMap<>();
+                    realtimeSensor.put("innerHumidity", realtimeData.getHumidity());
+                    realtimeSensor.put("hotAirTemperature", realtimeData.getHotAirTemperature());
+                    realtimeSensor.put("outletMoisture", realtimeData.getOutletMoisture());
+                    realtimeSensor.put("grainLayerThickness", realtimeData.getGrainLayerThickness());
+                    result.put("realtimeSensor", realtimeSensor);
+                }
+
+                // 设施状态 - 从数据库读取
+                FacilityStatus status = facilityStatusMapper.selectOne(
+                        new LambdaQueryWrapper<FacilityStatus>()
+                                .eq(FacilityStatus::getFacilityId, facility.getId())
+                                .last("LIMIT 1")
+                );
+                if (status != null) {
+                    // 运行状态
+                    Map<String, Object> operationStatus = new HashMap<>();
+                    operationStatus.put("runStatus", status.getRunStatus());
+                    operationStatus.put("innerTemperature", realtimeData != null ? realtimeData.getTemperature() : null);
+                    operationStatus.put("outletMoisture", realtimeData != null ? realtimeData.getOutletMoisture() : null);
+                    operationStatus.put("hotAirTemperature", realtimeData != null ? realtimeData.getHotAirTemperature() : null);
+                    result.put("operationStatus", operationStatus);
+
+                    // 烘干工艺数据
+                    Map<String, Object> processData = new HashMap<>();
+                    processData.put("grainType", status.getGrainTypeProcessed());
+                    processData.put("processingCapacity", status.getProcessingCapacity());
+                    processData.put("targetMoisture", status.getTargetMoistureProcess());
+                    result.put("processData", processData);
+
+                    // 设备状态
+                    Map<String, Object> deviceStatus = new HashMap<>();
+                    deviceStatus.put("elevator", status.getElevatorStatus());
+                    deviceStatus.put("circulatingFan", status.getCirculatingFanStatus());
+                    deviceStatus.put("burner", status.getBurnerStatus());
+                    deviceStatus.put("exhaustValve", status.getExhaustValveStatus());
+                    deviceStatus.put("verticalDryingFan", status.getVerticalDryingFanStatus());
+                    result.put("deviceStatus", deviceStatus);
+
+                    // 能耗数据
+                    Map<String, Object> energyConsumption = new HashMap<>();
+                    energyConsumption.put("instantPower", status.getInstantPower());
+                    energyConsumption.put("todayPowerConsumption", status.getTodayPowerConsumption());
+                    energyConsumption.put("gasFlowRate", status.getGasFlowRate());
+                    energyConsumption.put("outletGrainCount", status.getOutletGrainCount());
+                    result.put("energyConsumption", energyConsumption);
+                }
+            }
+
+            // 该设施的烘干批次
+            List<DryingBatch> batches = new ArrayList<>();
+            if (facility != null) {
+                batches = dryingService.lambdaQuery()
+                        .eq(DryingBatch::getFacilityId, facility.getId())
+                        .orderByDesc(DryingBatch::getCreateTime)
+                        .last("LIMIT 5")
+                        .list();
+            }
+            result.put("recentBatches", batches);
+            result.put("batchCount", batches.size());
+
+            // 烘干视频监控
+            Map<String, Object> videoMonitor = new HashMap<>();
+            videoMonitor.put("channel1", "camera_dry_001");
+            videoMonitor.put("channel2", "camera_dry_002");
+            videoMonitor.put("channel3", "camera_dry_003");
+            result.put("videoMonitor", videoMonitor);
+
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("获取烘干车间传感器数据失败, facilityId: {}", facilityId, e);
+            return Result.fail("获取烘干数据失败: " + e.getMessage());
         }
     }
 }

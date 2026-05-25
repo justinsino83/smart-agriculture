@@ -79,8 +79,14 @@ const routes = [
           {
             path: '/system/devices',
             name: 'Devices',
-            component: () => import('@/views/system/index.vue'),
+            component: () => import('@/views/system/DeviceManagement.vue'),
             meta: { title: '设备管理', icon: 'Monitor' }
+          },
+          {
+            path: '/system/users',
+            name: 'Users',
+            component: () => import('@/views/system/UserManagement.vue'),
+            meta: { title: '用户管理', icon: 'User' }
           }
         ]
       }

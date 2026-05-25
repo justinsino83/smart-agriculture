@@ -183,4 +183,14 @@ export const systemApi = {
   getLogs: (params) => api.get('/api/system/logs', { params })
 }
 
+// Facility APIs
+export const facilityApi = {
+  getAll: (type) => api.get('/api/facility/all', { params: { type } }),
+  getList: (page, size, type) => api.get('/api/facility/list', { params: { page, size, type } }),
+  getDetail: (id) => api.get(`/api/facility/${id}`),
+  create: (data) => api.post('/api/facility', data),
+  update: (id, data) => api.put(`/api/facility/${id}`, data),
+  delete: (id) => api.delete(`/api/facility/${id}`)
+}
+
 export default api

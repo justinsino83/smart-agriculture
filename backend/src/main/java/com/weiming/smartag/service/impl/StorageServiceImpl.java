@@ -51,10 +51,10 @@ public class StorageServiceImpl extends ServiceImpl<StorageRecordMapper, Storage
         
         List<StorageRecord> records = list();
         
-        // 库存统计
+        // 库存统计 - 使用 quantity 字段（单位：吨）
         double totalStock = records.stream()
                 .filter(r -> r.getStatus() == 0)
-                .mapToDouble(r -> r.getWeight() != null ? r.getWeight() : 0)
+                .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
                 .sum();
         
         long stockCount = records.stream().filter(r -> r.getStatus() == 0).count();
@@ -64,12 +64,12 @@ public class StorageServiceImpl extends ServiceImpl<StorageRecordMapper, Storage
         
         double todayIn = records.stream()
                 .filter(r -> r.getEntryDate() != null && r.getEntryDate().isAfter(today))
-                .mapToDouble(r -> r.getWeight() != null ? r.getWeight() : 0)
+                .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
                 .sum();
         
         double todayOut = records.stream()
                 .filter(r -> r.getStatus() == 1 && r.getExitDate() != null && r.getExitDate().isAfter(today))
-                .mapToDouble(r -> r.getWeight() != null ? r.getWeight() : 0)
+                .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
                 .sum();
         
         // 按粮食品种统计
@@ -77,14 +77,15 @@ public class StorageServiceImpl extends ServiceImpl<StorageRecordMapper, Storage
                 .filter(r -> r.getStatus() == 0)
                 .collect(Collectors.groupingBy(
                         StorageRecord::getGrainType,
-                        Collectors.summingDouble(r -> r.getWeight() != null ? r.getWeight() : 0)
+                        Collectors.summingDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
                 ));
         
-        // 库存预警（超过90天）
+        // 库存预警（超过90天 或 数量少于10吨）
         LocalDateTime warningDate = LocalDateTime.now().minusDays(90);
         long warningCount = records.stream()
-                .filter(r -> r.getStatus() == 0 && r.getEntryDate() != null)
-                .filter(r -> r.getEntryDate().isBefore(warningDate))
+                .filter(r -> r.getStatus() == 0)
+                .filter(r -> (r.getEntryDate() != null && r.getEntryDate().isBefore(warningDate)) || 
+                        (r.getQuantity() != null && r.getQuantity() < 10))
                 .count();
         
         stats.put("totalStock", Math.round(totalStock * 10) / 10.0);
@@ -120,13 +121,13 @@ public class StorageServiceImpl extends ServiceImpl<StorageRecordMapper, Storage
             double entryWeight = list().stream()
                     .filter(r -> r.getEntryDate() != null)
                     .filter(r -> !r.getEntryDate().isBefore(dayStart) && r.getEntryDate().isBefore(dayEnd))
-                    .mapToDouble(r -> r.getWeight() != null ? r.getWeight() : 0)
+                    .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
                     .sum();
             
             double exitWeight = list().stream()
                     .filter(r -> r.getExitDate() != null)
                     .filter(r -> !r.getExitDate().isBefore(dayStart) && r.getExitDate().isBefore(dayEnd))
-                    .mapToDouble(r -> r.getWeight() != null ? r.getWeight() : 0)
+                    .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
                     .sum();
             
             Map<String, Object> dayData = new HashMap<>();
@@ -137,5 +138,67 @@ public class StorageServiceImpl extends ServiceImpl<StorageRecordMapper, Storage
         }
         
         return trend;
+    }
+    
+    @Override
+    public Map<String, Object> getOverview() {
+        Map<String, Object> overview = new HashMap<>();
+        
+        List<StorageRecord> records = list();
+        
+        // 总库存 - 使用 quantity 字段（单位：吨）
+        double totalStock = records.stream()
+                .filter(r -> r.getStatus() == 0)
+                .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
+                .sum();
+        
+        // 今日出入库
+        LocalDateTime today = LocalDateTime.now().toLocalDate().atStartOfDay();
+        
+        double todayIn = records.stream()
+                .filter(r -> r.getEntryDate() != null && r.getEntryDate().isAfter(today))
+                .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
+                .sum();
+        
+        double todayOut = records.stream()
+                .filter(r -> r.getStatus() == 1 && r.getExitDate() != null && r.getExitDate().isAfter(today))
+                .mapToDouble(r -> r.getQuantity() != null ? r.getQuantity() : 0)
+                .sum();
+        
+        // 库存预警（超过90天 或 数量少于10吨）
+        LocalDateTime warningDate = LocalDateTime.now().minusDays(90);
+        long warningCount = records.stream()
+                .filter(r -> r.getStatus() == 0)
+                .filter(r -> (r.getEntryDate() != null && r.getEntryDate().isBefore(warningDate)) || 
+                        (r.getQuantity() != null && r.getQuantity() < 10))
+                .count();
+        
+        overview.put("totalStock", Math.round(totalStock * 10) / 10.0);
+        overview.put("todayIn", Math.round(todayIn * 10) / 10.0);
+        overview.put("todayOut", Math.round(todayOut * 10) / 10.0);
+        overview.put("warningCount", warningCount);
+        
+        return overview;
+    }
+    
+    @Override
+    public Map<String, Object> getStockListPage(int page, int size) {
+        Map<String, Object> result = new HashMap<>();
+        
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<StorageRecord> pageObj = 
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+        
+        com.baomidou.mybatisplus.core.metadata.IPage<StorageRecord> pageResult = 
+                lambdaQuery()
+                        .eq(StorageRecord::getStatus, 0)
+                        .orderByDesc(StorageRecord::getEntryDate)
+                        .page(pageObj);
+        
+        result.put("list", pageResult.getRecords());
+        result.put("total", pageResult.getTotal());
+        result.put("page", pageResult.getCurrent());
+        result.put("size", pageResult.getSize());
+        
+        return result;
     }
 }

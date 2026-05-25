@@ -18,6 +18,9 @@ public class DevicePushData {
     @TableId(type = IdType.AUTO)
     private Long id;
     
+    /** 设施ID */
+    private Long facilityId;
+    
     /** 设备编号/客户端ID */
     private String clientId;
     

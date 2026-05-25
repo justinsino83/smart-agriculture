@@ -1,5 +1,6 @@
 package com.weiming.smartag.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.weiming.smartag.entity.WeatherData;
 import org.apache.ibatis.annotations.Mapper;
@@ -12,7 +13,7 @@ import java.util.List;
  * 气象数据Mapper
  */
 @Mapper
-public interface WeatherDataMapper extends IService<WeatherData> {
+public interface WeatherDataMapper extends BaseMapper<WeatherData> {
 
     /**
      * 获取最新气象数据

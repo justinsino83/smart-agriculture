@@ -95,7 +95,7 @@ class DashboardControllerTest {
 
     @Test
     void testGetRealtimeData() {
-        Result<Map<String, Object>> result = dashboardController.getRealtimeData();
+        Result<Map<String, Object>> result = dashboardController.getRealtimeData(null);
 
         assertNotNull(result);
         assertEquals(200, result.getCode());

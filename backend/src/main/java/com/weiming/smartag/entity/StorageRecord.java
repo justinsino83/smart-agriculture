@@ -14,6 +14,9 @@ public class StorageRecord {
     @TableId(type = IdType.AUTO)
     private Long id;
     
+    /** 设施ID */
+    private Long facilityId;
+    
     /** 批次号 */
     private String batchNo;
     

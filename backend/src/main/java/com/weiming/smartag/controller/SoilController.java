@@ -25,12 +25,12 @@ public class SoilController {
     private final SoilService soilService;
     
     /**
-     * 获取所有传感器列表
+     * 获取所有传感器列表（包含实时监测数据）
      */
     @GetMapping("/sensors")
     public Result<List<?>> listSensors() {
         try {
-            return Result.success(soilService.list());
+            return Result.success(soilService.listSensorsWithRealTimeData());
         } catch (Exception e) {
             log.error("获取传感器列表失败", e);
             return Result.fail("获取传感器列表失败: " + e.getMessage());

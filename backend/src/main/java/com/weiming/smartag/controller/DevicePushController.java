@@ -188,13 +188,14 @@ public class DevicePushController {
      * 获取仪表盘综合数据
      */
     @GetMapping("/dashboard/overview")
-    @Operation(summary = "获取仪表盘综合数据", description = "获取设备数据、环境数据、告警信息等综合数据")
-    public Result<Map<String, Object>> getDashboardOverview() {
+    @Operation(summary = "获取仪表盘综合数据", description = "获取设备数据、环境数据、告警信息等综合数据，支持按设备过滤")
+    public Result<Map<String, Object>> getDashboardOverview(
+            @RequestParam(required = false) String clientId) {
         try {
-            Map<String, Object> data = devicePushService.getDashboardOverview();
+            Map<String, Object> data = devicePushService.getDashboardOverview(clientId);
             return Result.success(data);
         } catch (Exception e) {
-            log.error("获取仪表盘数据失败", e);
+            log.error("获取仪表盘数据失败, clientId:{}", clientId, e);
             return Result.fail("获取数据失败: " + e.getMessage());
         }
     }

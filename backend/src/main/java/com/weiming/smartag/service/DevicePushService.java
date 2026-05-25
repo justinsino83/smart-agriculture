@@ -45,8 +45,9 @@ public interface DevicePushService extends IService<DevicePushData> {
     
     /**
      * 获取仪表盘综合数据（对接DevicePushData）
+     * @param clientId 可选设备ID，不传则返回全局数据
      */
-    Map<String, Object> getDashboardOverview();
+    Map<String, Object> getDashboardOverview(String clientId);
     
     /**
      * 历史数据去重

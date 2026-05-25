@@ -4,121 +4,130 @@
     <div v-if="loading" class="loading-container">
       <el-skeleton :rows="6" animated />
     </div>
-    
+
     <template v-else>
-    <!-- 顶部统计 -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-icon yellow"><el-icon><Lightning /></el-icon></div>
-        <div class="stat-content">
-          <div class="stat-value">{{ todayPower }}<span class="unit">kWh</span></div>
-          <div class="stat-label">今日用电</div>
+      <!-- 顶部统计 -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon yellow"><el-icon>
+              <Lightning />
+            </el-icon></div>
+          <div class="stat-content">
+            <div class="stat-value">{{ todayPower }}<span class="unit">kWh</span></div>
+            <div class="stat-label">今日用电</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon green"><el-icon>
+              <Money />
+            </el-icon></div>
+          <div class="stat-content">
+            <div class="stat-value">{{ todayCost }}<span class="unit">元</span></div>
+            <div class="stat-label">今日电费</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon blue"><el-icon>
+              <TrendCharts />
+            </el-icon></div>
+          <div class="stat-content">
+            <div class="stat-value">{{ avgEfficiency }}<span class="unit">%</span></div>
+            <div class="stat-label">能效指数</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon cyan"><el-icon>
+              <Odometer />
+            </el-icon></div>
+          <div class="stat-content">
+            <div class="stat-value">{{ carbonSaved }}<span class="unit">kg</span></div>
+            <div class="stat-label">累计减碳</div>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card">
-        <div class="stat-icon green"><el-icon><Money /></el-icon></div>
-        <div class="stat-content">
-          <div class="stat-value">{{ todayCost }}<span class="unit">元</span></div>
-          <div class="stat-label">今日电费</div>
+      <div class="main-grid">
+        <!-- 用电趋势 -->
+        <div class="card">
+          <div class="card-header">
+            <h3>用电趋势分析</h3>
+
+            <el-radio-group v-model="chartPeriod" size="small" @change="onPeriodChange">
+              <el-radio-button label="day">今日</el-radio-button>
+              <el-radio-button label="week">本周</el-radio-button>
+              <el-radio-button label="month">本月</el-radio-button>
+            </el-radio-group>
+          </div>
+
+          <div class="card-body">
+            <div ref="powerChart" class="chart"></div>
+          </div>
+        </div>
+
+        <!-- 设备能耗占比 -->
+        <div class="card">
+          <div class="card-header">
+            <h3>设备能耗占比</h3>
+          </div>
+
+          <div class="card-body">
+            <div ref="deviceChart" class="chart pie-chart"></div>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card">
-        <div class="stat-icon blue"><el-icon><TrendCharts /></el-icon></div>
-        <div class="stat-content">
-          <div class="stat-value">{{ avgEfficiency }}<span class="unit">%</span></div>
-          <div class="stat-label">能效指数</div>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon cyan"><el-icon><Odometer /></el-icon></div>
-        <div class="stat-content">
-          <div class="stat-value">{{ carbonSaved }}<span class="unit">kg</span></div>
-          <div class="stat-label">累计减碳</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="main-grid">
-      <!-- 用电趋势 -->
+      <!-- 能耗明细表 -->
       <div class="card">
         <div class="card-header">
-          <h3>用电趋势分析</h3>
-          
-          <el-radio-group v-model="chartPeriod" size="small" @change="onPeriodChange">
-            <el-radio-button label="day">今日</el-radio-button>
-            <el-radio-button label="week">本周</el-radio-button>
-            <el-radio-button label="month">本月</el-radio-button>
-          </el-radio-group>
+          <h3>能耗明细</h3>
         </div>
 
         <div class="card-body">
-          <div ref="powerChart" class="chart"></div>
+          <el-table :data="energyList" stripe v-loading="tableLoading" style="width: 100%"
+            :cell-style="{ padding: '10px 0' }"
+            :header-cell-style="{ padding: '12px 0', background: '#fafafa', color: '#262626' }">
+            <el-table-column prop="time" label="时间" min-width="170" />
+
+            <el-table-column prop="device" label="设备名称" min-width="160" show-overflow-tooltip />
+
+            <el-table-column prop="type" label="能耗类型" min-width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.type === '电' ? 'primary' : 'success'">{{ row.type }}</el-tag>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="usage" label="用量" min-width="120" align="right">
+              <template #default="{ row }">
+                <span style="font-weight: 500; padding-right: 10px;">{{ row.usage }} {{ row.unit }}</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="cost" label="费用(元)" min-width="120" align="right">
+              <template #default="{ row }">
+                <span class="text-primary" style="padding-right: 10px;">{{ row.cost }}</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="efficiency" label="能效等级" min-width="150" align="center">
+              <template #default="{ row }">
+                <div style="display: inline-block; white-space: nowrap;">
+                  <el-rate v-model="row.efficiency" disabled />
+                </div>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip />
+          </el-table>
+
+          <div class="pagination">
+            <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :total="total"
+              layout="total, prev, pager, next" @current-change="loadEnergyList" />
+          </div>
         </div>
       </div>
-
-      <!-- 设备能耗占比 -->
-      <div class="card">
-        <div class="card-header">
-          <h3>设备能耗占比</h3>
-        </div>
-
-        <div class="card-body">
-          <div ref="deviceChart" class="chart pie-chart"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 能耗明细表 -->
-    <div class="card">
-      <div class="card-header">
-        <h3>能耗明细</h3>
-      </div>
-
-      <div class="card-body">
-        <el-table :data="energyList" stripe v-loading="tableLoading">
-          <el-table-column prop="time" label="时间" width="180" />
-          <el-table-column prop="device" label="设备名称" width="150" />
-          <el-table-column prop="type" label="能耗类型" width="120">
-            <template #default="{ row }">
-              <el-tag :type="row.type === '电' ? 'primary' : 'success'">{{ row.type }}</el-tag>
-            </template>
-          </el-table-column>
-
-          <el-table-column prop="usage" label="用量" width="120">
-            <template #default="{ row }">
-              {{ row.usage }} {{ row.unit }}
-            </template>
-          </el-table-column>
-
-          <el-table-column prop="cost" label="费用(元)" width="120">
-            <template #default="{ row }">
-              <span class="text-primary">{{ row.cost }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column prop="efficiency" label="能效等级" width="120">
-            <template #default="{ row }">
-              <el-rate v-model="row.efficiency" disabled />
-            </template>
-          </el-table-column>
-
-          <el-table-column prop="remark" label="备注" />
-        </el-table>
-
-        <div class="pagination">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :total="total"
-            layout="total, prev, pager, next"
-            @current-change="loadEnergyList"
-          />
-        </div>
-      </div>
-    </div>
     </template>
   </div>
 </template>
@@ -178,9 +187,9 @@ const loadEnergyList = async () => {
   tableLoading.value = true
   try {
     // 调用实际API获取能耗明细
-    const response = await energyApi.getList({ 
-      page: currentPage.value, 
-      size: pageSize.value 
+    const response = await energyApi.getList({
+      page: currentPage.value,
+      size: pageSize.value
     })
     if (response) {
       energyList.value = response.list || response.records || []
@@ -209,13 +218,13 @@ const loadChartData = async () => {
       energyApi.getDeviceUsage(),
       energyApi.getTrend(chartPeriod.value)
     ])
-    
+
     if (deviceUsage && deviceUsage.length > 0) {
       initDeviceChart(deviceUsage)
     } else {
       initDeviceChart(generateDefaultDeviceUsage())
     }
-    
+
     if (trendData && trendData.length > 0) {
       initPowerChart(trendData)
     } else {
@@ -246,12 +255,12 @@ const generateDefaultDeviceUsage = () => {
 
 const initPowerChart = (data) => {
   if (!powerChart.value) return
-  
+
   powerChartInstance = echarts.init(powerChart.value)
   const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`)
-  
+
   const chartData = data && data.length > 0 ? data : generateDefaultTrend()
-  
+
   const option = {
     tooltip: { trigger: 'axis' },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
@@ -288,11 +297,11 @@ const initPowerChart = (data) => {
 
 const initDeviceChart = (data) => {
   if (!deviceChart.value) return
-  
+
   deviceChartInstance = echarts.init(deviceChart.value)
-  
+
   const chartData = data && data.length > 0 ? data : generateDefaultDeviceUsage()
-  
+
   const option = {
     tooltip: { trigger: 'item', formatter: '{b}: {c}kWh ({d}%)' },
     legend: {
@@ -330,19 +339,26 @@ const initCharts = () => {
 
 onMounted(async () => {
   try {
+    // 1. 先加载不依赖特定 DOM 尺寸的数据
     await Promise.all([
       loadStats(),
       loadEnergyList()
     ])
-    // 确保DOM渲染完成后初始化图表
+    
+    // 2. 核心修复：数据拿到后，先把 loading 关掉
+    // 这样 v-else 里的图表 DOM 就会被 Vue 挂载到页面上
+    loading.value = false
+    
+    // 3. 等待 Vue 将 DOM 实际渲染完成
     await nextTick()
-    await nextTick()
+    
+    // 4. 此时图表 DOM (powerChart.value 和 deviceChart.value) 已经存在，安全加载图表
     await loadChartData()
+    
   } catch (error) {
     console.error('初始化数据失败:', error)
     ElMessage.error('数据加载失败，请检查网络')
-  } finally {
-    loading.value = false
+    loading.value = false // 发生错误时也要确保关掉 loading
   }
   
   // 响应式调整
@@ -385,7 +401,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .stat-icon {
@@ -399,10 +415,21 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.stat-icon.yellow { background: #faad14; }
-.stat-icon.green { background: #52c41a; }
-.stat-icon.blue { background: #1890ff; }
-.stat-icon.cyan { background: #13c2c2; }
+.stat-icon.yellow {
+  background: #faad14;
+}
+
+.stat-icon.green {
+  background: #52c41a;
+}
+
+.stat-icon.blue {
+  background: #1890ff;
+}
+
+.stat-icon.cyan {
+  background: #13c2c2;
+}
 
 .stat-value {
   font-size: 28px;
@@ -433,7 +460,7 @@ onUnmounted(() => {
 .card {
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .card-header {

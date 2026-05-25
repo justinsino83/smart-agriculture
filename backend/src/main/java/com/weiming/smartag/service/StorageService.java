@@ -35,4 +35,14 @@ public interface StorageService extends IService<StorageRecord> {
      * 获取出入库趋势
      */
     List<Map<String, Object>> getEntryExitTrend(int days);
+    
+    /**
+     * 获取仓储概览
+     */
+    Map<String, Object> getOverview();
+    
+    /**
+     * 分页获取库存列表
+     */
+    Map<String, Object> getStockListPage(int page, int size);
 }
