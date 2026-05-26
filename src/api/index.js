@@ -112,14 +112,15 @@ export const weatherApi = {
 
 // Soil APIs
 export const soilApi = {
-  getSensors: () => api.get('/api/soil/sensors'),
-  getRealTimeData: (sensorId) => api.get(`/api/soil/realtime/${sensorId}`),
-  getHistoryData: (sensorId, start, end) => api.get(`/api/soil/history/${sensorId}`, { params: { start, end } }),
-  getOverview: () => api.get('/api/soil/overview'),
-  getTrend: (sensorId, days = 7) => api.get(`/api/soil/trend/${sensorId}`, { params: { days } }),
-  getStatistics: () => api.get('/api/soil/statistics'),
-  getAlerts: () => api.get('/api/soil/alerts'),
-  getRecommendations: () => api.get('/api/soil/recommendations')
+    getSensors: () => api.get('/api/soil/sensors'),
+    getRealTimeData: (sensorId) => api.get(`/api/soil/realtime/${sensorId}`),
+    getHistoryData: (sensorId, start, end) => api.get(`/api/soil/history/${sensorId}`, { params: { start, end } }),
+    getHistoryDataPage: (sensorId, start, end, page, size) => api.get(`/api/soil/history/${sensorId}/page`, { params: { start, end, page, size } }),
+    getOverview: () => api.get('/api/soil/overview'),
+    getTrend: (sensorId, days = 7) => api.get(`/api/soil/trend/${sensorId}`, { params: { days } }),
+    getStatistics: () => api.get('/api/soil/statistics'),
+    getAlerts: () => api.get('/api/soil/alerts'),
+    getRecommendations: () => api.get('/api/soil/recommendations')
 }
 
 // Irrigation APIs

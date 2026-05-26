@@ -5,7 +5,7 @@
         <h2>智慧仓储</h2>
         <el-tag type="info">总库存: {{ formatNumber(totalStock) }} 吨</el-tag>
       </div>
-      
+
       <div class="header-actions">
         <el-button type="primary" @click="showInDialog = true">入库登记</el-button>
         <el-button @click="showOutDialog = true">出库登记</el-button>
@@ -16,31 +16,39 @@
       <!-- 库存概览 -->
       <div class="stats-row">
         <div class="stat-card">
-          <div class="stat-icon yellow"><el-icon><Box /></el-icon></div>
+          <div class="stat-icon yellow"><el-icon>
+              <Box />
+            </el-icon></div>
           <div class="stat-content">
             <div class="stat-value">{{ formatNumber(totalStock) }}<span class="unit">吨</span></div>
             <div class="stat-label">当前库存</div>
           </div>
         </div>
-        
+
         <div class="stat-card">
-          <div class="stat-icon blue"><el-icon><ArrowDown /></el-icon></div>
+          <div class="stat-icon blue"><el-icon>
+              <ArrowDown />
+            </el-icon></div>
           <div class="stat-content">
             <div class="stat-value">{{ formatNumber(todayIn) }}<span class="unit">吨</span></div>
             <div class="stat-label">今日入库</div>
           </div>
         </div>
-        
+
         <div class="stat-card">
-          <div class="stat-icon green"><el-icon><ArrowUp /></el-icon></div>
+          <div class="stat-icon green"><el-icon>
+              <ArrowUp />
+            </el-icon></div>
           <div class="stat-content">
             <div class="stat-value">{{ formatNumber(todayOut) }}<span class="unit">吨</span></div>
             <div class="stat-label">今日出库</div>
           </div>
         </div>
-        
+
         <div class="stat-card">
-          <div class="stat-icon red"><el-icon><Warning /></el-icon></div>
+          <div class="stat-icon red"><el-icon>
+              <Warning />
+            </el-icon></div>
           <div class="stat-content">
             <div class="stat-value">{{ warningCount }}<span class="unit">条</span></div>
             <div class="stat-label">库存预警</div>
@@ -52,57 +60,62 @@
       <div class="card">
         <div class="card-header">
           <h3>库存明细</h3>
-          
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索品种/批次号"
-            style="width: 200px"
-            clearable
-          >
-            <template #prefix><el-icon><Search /></el-icon></template>
+
+          <el-input v-model="searchKeyword" placeholder="搜索品种/批次号" style="width: 200px" clearable>
+            <template #prefix><el-icon>
+                <Search />
+              </el-icon></template>
           </el-input>
         </div>
-        
+
         <div class="card-body">
-          <el-table :data="filteredStockList" stripe style="width: 100%" height="calc(100vh - 400px)">
-            <el-table-column prop="grainType" label="粮食品种" width="120" />
-            <el-table-column prop="batchNo" label="批次号" min-width="160" />
-            <el-table-column prop="warehouse" label="仓库位置" min-width="150" />
-            <el-table-column prop="quantity" label="数量(吨)" width="120">
+          <el-table :data="filteredStockList" stripe style="width: 100%" height="calc(100vh - 400px)"
+            v-loading="loading" :cell-style="{ padding: '10px 0' }"
+            :header-cell-style="{ padding: '12px 0', background: '#fafafa', color: '#262626' }">
+            <el-table-column prop="grainType" label="粮食品种" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="batchNo" label="批次号" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="warehouse" label="仓库位置" min-width="150" show-overflow-tooltip />
+
+            <el-table-column prop="quantity" label="数量(吨)" min-width="120" align="right">
               <template #default="{ row }">
-                <span :class="{ 'text-warning': row.quantity < 10 }">{{ row.quantity }}</span>
+                <span :class="{ 'text-warning': row.quantity < 10 }" style="padding-right: 15px; font-weight: 500;">
+                  {{ row.quantity }}
+                </span>
               </template>
             </el-table-column>
-            <el-table-column prop="moisture" label="含水率(%)" width="120" />
-            <el-table-column prop="quality" label="质量等级" width="100">
+
+            <el-table-column prop="moisture" label="含水率(%)" min-width="120" align="right">
+              <template #default="{ row }">
+                <span style="padding-right: 15px;">{{ row.moisture }}</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="quality" label="质量等级" min-width="100" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.quality === '一等' ? 'success' : 'info'">{{ row.quality }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="entryDate" label="入库日期" width="180" />
-            <el-table-column prop="expireDate" label="保质期限" min-width="180">
+
+            <el-table-column prop="entryDate" label="入库日期" min-width="160" />
+
+            <el-table-column prop="expireDate" label="保质期限" min-width="160">
               <template #default="{ row }">
                 <span :class="{ 'text-danger': isNearExpire(row.expireDate) }">{{ row.expireDate }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
+
+            <el-table-column label="操作" width="150" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button link type="primary" @click="viewDetail(row)">详情</el-button>
                 <el-button link type="primary" @click="viewTrace(row)">追溯</el-button>
               </template>
             </el-table-column>
           </el-table>
-          
+
           <div class="pagination">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :total="total"
-              :page-sizes="[10, 20, 50]"
-              layout="total, sizes, prev, pager, next"
-              @size-change="handlePageChange"
-              @current-change="handlePageChange"
-            />
+            <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :total="total"
+              :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" @size-change="handlePageChange"
+              @current-change="handlePageChange" />
           </div>
         </div>
       </div>
@@ -118,12 +131,12 @@
             <el-option label="玉米" value="玉米" />
           </el-select>
         </el-form-item>
-        
+
         <el-form-item label="入库数量">
           <el-input-number v-model="inForm.quantity" :min="1" style="width: 100%" />
           <span class="unit">吨</span>
         </el-form-item>
-        
+
         <el-form-item label="仓库位置">
           <el-select v-model="inForm.warehouse" style="width: 100%">
             <el-option label="1号仓库-A区" value="1号仓库-A区" />
@@ -131,13 +144,13 @@
             <el-option label="2号仓库" value="2号仓库" />
           </el-select>
         </el-form-item>
-        
+
         <el-form-item label="含水率">
           <el-input-number v-model="inForm.moisture" :min="10" :max="20" :precision="1" style="width: 100%" />
           <span class="unit">%</span>
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <el-button @click="showInDialog = false">取消</el-button>
         <el-button type="primary" @click="saveIn">确认入库</el-button>
@@ -201,7 +214,7 @@ const formatStockItem = (item) => {
   if (item.quality === 2) qualityText = '二等';
   else if (item.quality === 3) qualityText = '三等';
   else if (typeof item.quality === 'string') qualityText = item.quality;
-  
+
   return {
     id: item.id,
     grainType: item.grainType || '未知',
@@ -217,7 +230,7 @@ const formatStockItem = (item) => {
 
 const filteredStockList = computed(() => {
   if (!searchKeyword.value) return stockList.value
-  return stockList.value.filter(item => 
+  return stockList.value.filter(item =>
     item.grainType.includes(searchKeyword.value) ||
     item.batchNo.includes(searchKeyword.value)
   )
@@ -266,13 +279,13 @@ const loadStorageData = async () => {
       storageApi.getStockList({ page: currentPage.value, size: pageSize.value }),
       storageApi.getOverview()
     ])
-    
+
     if (stockData) {
       const data = stockData.list || stockData.records || []
       stockList.value = data.map(formatStockItem)
       total.value = stockData.total || stockList.value.length
     }
-    
+
     if (overviewData) {
       totalStock.value = overviewData.totalStock || 0
       todayIn.value = overviewData.todayIn || 0
@@ -339,7 +352,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .stat-icon {
@@ -353,10 +366,21 @@ onMounted(() => {
   color: #fff;
 }
 
-.stat-icon.yellow { background: #faad14; }
-.stat-icon.blue { background: #1890ff; }
-.stat-icon.green { background: #52c41a; }
-.stat-icon.red { background: #f5222d; }
+.stat-icon.yellow {
+  background: #faad14;
+}
+
+.stat-icon.blue {
+  background: #1890ff;
+}
+
+.stat-icon.green {
+  background: #52c41a;
+}
+
+.stat-icon.red {
+  background: #f5222d;
+}
 
 .stat-value {
   font-size: 28px;
@@ -380,7 +404,7 @@ onMounted(() => {
 .card {
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   flex: 1;
   display: flex;
   flex-direction: column;

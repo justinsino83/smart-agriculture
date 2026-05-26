@@ -3,6 +3,35 @@
 CREATE DATABASE IF NOT EXISTS smart_agriculture DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE smart_agriculture;
 
+-- 设施表
+CREATE TABLE IF NOT EXISTS facility (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    name VARCHAR(50) NOT NULL COMMENT '设施名称',
+    code VARCHAR(20) NOT NULL COMMENT '设施编号',
+    type TINYINT NOT NULL COMMENT '设施类型:1-试验田,2-仓库,3-烘干车间',
+    location VARCHAR(100) COMMENT '位置',
+    area DOUBLE COMMENT '面积/容量',
+    manager VARCHAR(20) COMMENT '负责人',
+    status TINYINT DEFAULT 1 COMMENT '状态:0-停用,1-正常',
+    description TEXT COMMENT '描述',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB COMMENT='设施表';
+
+-- 插入设施数据
+INSERT INTO facility (name, code, type, location, area, manager, status, description) VALUES
+('试验田-1号田', 'TEST001', 1, '园区东区', 50.5, '张三', 1, '水稻种植试验田'),
+('试验田-2号田', 'TEST002', 1, '园区东区', 35.2, '李四', 1, '小麦种植试验田'),
+('试验田-3号田', 'TEST003', 1, '园区西区', 42.8, '王五', 1, '玉米种植试验田'),
+('试验田-4号田', 'TEST004', 1, '园区西区', 28.6, '赵六', 1, '大豆种植试验田'),
+('试验田-5号田', 'TEST005', 1, '园区中心', 15.0, '孙琪', 1, '综合试验田'),
+('仓库-A库', 'WH-A', 2, '仓储区A栋', 500.0, '仓管员A', 1, 'A区仓库'),
+('仓库-B库', 'WH-B', 2, '仓储区B栋', 350.0, '仓管员B', 1, 'B区仓库'),
+('仓库-C库', 'WH-C', 2, '仓储区C栋', 400.0, '仓管员C', 1, 'C区仓库'),
+('烘干车间-1号', 'DRY01', 3, '烘干区A栋', 800.0, '烘干员A', 1, '1号烘干车间'),
+('烘干车间-2号', 'DRY02', 3, '烘干区B栋', 600.0, '烘干员B', 1, '2号烘干车间'),
+('烘干车间-3号', 'DRY03', 3, '烘干区C栋', 700.0, '烘干员C', 1, '3号烘干车间');
+
 -- 农田地块表
 CREATE TABLE IF NOT EXISTS farm_field (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',

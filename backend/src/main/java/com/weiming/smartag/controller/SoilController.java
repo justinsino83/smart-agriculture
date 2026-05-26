@@ -60,32 +60,89 @@ public class SoilController {
     @GetMapping("/history/{sensorId}")
     public Result<List<?>> getHistoryData(
             @PathVariable Long sensorId,
-            @RequestParam String start,
-            @RequestParam String end) {
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end) {
         try {
             if (sensorId == null || sensorId <= 0) {
                 return Result.fail("传感器ID必须大于0");
             }
-            if (!StringUtils.hasText(start)) {
-                return Result.fail("开始时间不能为空");
+            
+            LocalDateTime startTime = null;
+            LocalDateTime endTime = null;
+            
+            if (StringUtils.hasText(start)) {
+                try {
+                    startTime = LocalDateTime.parse(start.replace("Z", "").substring(0, 19));
+                } catch (DateTimeParseException e) {
+                    return Result.fail("开始时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式");
+                }
             }
-            if (!StringUtils.hasText(end)) {
-                return Result.fail("结束时间不能为空");
+            if (StringUtils.hasText(end)) {
+                try {
+                    endTime = LocalDateTime.parse(end.replace("Z", "").substring(0, 19));
+                } catch (DateTimeParseException e) {
+                    return Result.fail("结束时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式");
+                }
             }
             
-            LocalDateTime startTime = LocalDateTime.parse(start.replace("Z", "").substring(0, 19));
-            LocalDateTime endTime = LocalDateTime.parse(end.replace("Z", "").substring(0, 19));
-            
-            if (startTime.isAfter(endTime)) {
+            if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
                 return Result.fail("开始时间不能大于结束时间");
             }
             
             return Result.success(soilService.getHistoryData(sensorId, startTime, endTime));
-        } catch (DateTimeParseException e) {
-            log.error("日期格式错误, start: {}, end: {}", start, end, e);
-            return Result.fail("日期格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式");
         } catch (Exception e) {
             log.error("获取历史数据失败, sensorId: {}, start: {}, end: {}", sensorId, start, end, e);
+            return Result.fail("获取历史数据失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取传感器历史数据（分页）
+     */
+    @GetMapping("/history/{sensorId}/page")
+    public Result<Map<String, Object>> getHistoryDataPage(
+            @PathVariable Long sensorId,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            if (sensorId == null || sensorId <= 0) {
+                return Result.fail("传感器ID必须大于0");
+            }
+            if (page <= 0) {
+                return Result.fail("页码必须大于0");
+            }
+            if (size <= 0 || size > 100) {
+                return Result.fail("每页数量必须在1-100之间");
+            }
+            
+            LocalDateTime startTime = null;
+            LocalDateTime endTime = null;
+            
+            if (StringUtils.hasText(start)) {
+                try {
+                    startTime = LocalDateTime.parse(start.replace("Z", "").substring(0, 19));
+                } catch (DateTimeParseException e) {
+                    return Result.fail("开始时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式");
+                }
+            }
+            if (StringUtils.hasText(end)) {
+                try {
+                    endTime = LocalDateTime.parse(end.replace("Z", "").substring(0, 19));
+                } catch (DateTimeParseException e) {
+                    return Result.fail("结束时间格式错误，请使用 yyyy-MM-dd HH:mm:ss 格式");
+                }
+            }
+            
+            if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
+                return Result.fail("开始时间不能大于结束时间");
+            }
+            
+            return Result.success(soilService.getHistoryDataPage(sensorId, startTime, endTime, page, size));
+        } catch (Exception e) {
+            log.error("获取历史数据失败, sensorId: {}, start: {}, end: {}, page: {}, size: {}", 
+                    sensorId, start, end, page, size, e);
             return Result.fail("获取历史数据失败: " + e.getMessage());
         }
     }
@@ -124,7 +181,7 @@ public class SoilController {
      * 获取数据趋势
      */
     @GetMapping("/trend/{sensorId}")
-    public Result<Map<String, List<Double>>> getTrend(
+    public Result<Map<String, Object>> getTrend(
             @PathVariable Long sensorId,
             @RequestParam(defaultValue = "7") int days) {
         try {

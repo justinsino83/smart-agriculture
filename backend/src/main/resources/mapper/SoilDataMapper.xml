@@ -7,7 +7,15 @@
     </select>
 
     <select id="selectHistoryData" resultType="com.weiming.smartag.entity.SoilData">
-        SELECT * FROM soil_data WHERE sensor_id = #{sensorId} AND collect_time BETWEEN #{start} AND #{end} ORDER BY collect_time ASC
+        SELECT * FROM soil_data 
+        WHERE sensor_id = #{sensorId}
+        <if test="start != null">
+            AND collect_time &gt;= #{start}
+        </if>
+        <if test="end != null">
+            AND collect_time &lt;= #{end}
+        </if>
+        ORDER BY collect_time ASC
     </select>
     
 </mapper>

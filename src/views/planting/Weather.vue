@@ -2,7 +2,8 @@
   <div class="weather-page">
     <!-- 第一行：筛选条件 -->
     <div class="filter-row">
-      <el-select v-model="filterForm.deviceCode" placeholder="选择设备号" clearable size="default" style="width: 200px" @change="handleFilterChange">
+      <el-select v-model="filterForm.deviceCode" placeholder="选择设备号" clearable size="default" style="width: 200px"
+        @change="handleFilterChange">
         <el-option label="1号田土壤传感器" value="SS20240001" />
         <el-option label="2号田土壤传感器" value="SS20240002" />
         <el-option label="3号田土壤传感器" value="SS20240003" />
@@ -14,23 +15,19 @@
         <el-option label="12号田土壤传感器" value="SS20240012" />
       </el-select>
 
-      <el-date-picker
-        v-model="filterForm.dateRange"
-        type="datetimerange"
-        range-separator="至"
-        start-placeholder="开始时间"
-        end-placeholder="结束时间"
-        size="default"
-        style="width: 380px"
-        @change="handleFilterChange"
-      />
+      <el-date-picker v-model="filterForm.dateRange" type="datetimerange" range-separator="至" start-placeholder="开始时间"
+        end-placeholder="结束时间" size="default" style="width: 380px" @change="handleFilterChange" />
 
       <el-button type="primary" @click="handleRefresh">
-        <el-icon><Refresh /></el-icon> 刷新数据
+        <el-icon>
+          <Refresh />
+        </el-icon> 刷新数据
       </el-button>
 
       <el-button @click="handleExport">
-        <el-icon><Download /></el-icon> 导出数据
+        <el-icon>
+          <Download />
+        </el-icon> 导出数据
       </el-button>
     </div>
 
@@ -38,7 +35,9 @@
     <div class="realtime-cards">
       <div class="realtime-card">
         <div class="card-icon blue">
-          <el-icon><Sunny /></el-icon>
+          <el-icon>
+            <Sunny />
+          </el-icon>
         </div>
         <div class="card-content">
           <div class="card-value">{{ currentData.temperature }}°C</div>
@@ -48,7 +47,9 @@
 
       <div class="realtime-card">
         <div class="card-icon cyan">
-          <el-icon><Sunrise /></el-icon>
+          <el-icon>
+            <Sunrise />
+          </el-icon>
         </div>
         <div class="card-content">
           <div class="card-value">{{ currentData.humidity }}%</div>
@@ -58,7 +59,9 @@
 
       <div class="realtime-card">
         <div class="card-icon green">
-          <el-icon><WindPower /></el-icon>
+          <el-icon>
+            <WindPower />
+          </el-icon>
         </div>
         <div class="card-content">
           <div class="card-value">{{ currentData.windSpeed }} m/s</div>
@@ -68,7 +71,9 @@
 
       <div class="realtime-card">
         <div class="card-icon orange">
-          <el-icon><Compass /></el-icon>
+          <el-icon>
+            <Compass />
+          </el-icon>
         </div>
         <div class="card-content">
           <div class="card-value">{{ currentData.windDirectionName || '—' }}</div>
@@ -78,7 +83,9 @@
 
       <div class="realtime-card">
         <div class="card-icon purple">
-          <el-icon><Odometer /></el-icon>
+          <el-icon>
+            <Odometer />
+          </el-icon>
         </div>
         <div class="card-content">
           <div class="card-value">{{ currentData.pressure }} hPa</div>
@@ -88,7 +95,9 @@
 
       <div class="realtime-card">
         <div class="card-icon gray">
-          <el-icon><QuartzWatch /></el-icon>
+          <el-icon>
+            <QuartzWatch />
+          </el-icon>
         </div>
         <div class="card-content">
           <div class="card-value">{{ currentData.weatherText || '—' }}</div>
@@ -134,22 +143,40 @@
         <h3>每小时风向变化</h3>
       </div>
       <div class="card-body">
-        <el-table :data="hourlyWindData" stripe style="width: 100%" v-loading="loading">
-          <el-table-column prop="time" label="时间" width="100" />
-          <el-table-column prop="directionName" label="风向" width="120">
+        <el-table :data="hourlyWindData" stripe style="width: 100%" v-loading="loading"
+          :cell-style="{ padding: '10px 0' }"
+          :header-cell-style="{ padding: '12px 0', background: '#fafafa', color: '#262626' }">
+          <el-table-column prop="time" label="时间" min-width="140" />
+
+          <el-table-column prop="directionName" label="风向" min-width="120">
             <template #default="{ row }">
-              <span :style="{ color: getWindDirectionColor(row.direction) }">{{ row.directionName }}</span>
+              <span :style="{ color: getWindDirectionColor(row.direction), fontWeight: 500 }">
+                {{ row.directionName }}
+              </span>
             </template>
           </el-table-column>
-          <el-table-column prop="direction" label="角度" width="100">
+
+          <el-table-column prop="direction" label="角度" min-width="120" align="right">
             <template #default="{ row }">
-              {{ row.direction ? row.direction + '°' : '—' }}
+              <span style="padding-right: 15px;">
+                {{ row.direction ? row.direction + '°' : '—' }}
+              </span>
             </template>
           </el-table-column>
-          <el-table-column prop="windSpeed" label="风速(m/s)" width="120" />
-          <el-table-column label="风向示意" min-width="200">
+
+          <el-table-column prop="windSpeed" label="风速(m/s)" min-width="120" align="right">
             <template #default="{ row }">
-              <div v-if="row.direction" class="wind-arrow" :style="{ transform: `rotate(${row.direction}deg)` }">↑</div>
+              <span style="padding-right: 15px; font-weight: 500;">
+                {{ row.windSpeed }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="风向示意" min-width="180" align="center">
+            <template #default="{ row }">
+              <div v-if="row.direction" class="wind-arrow" :style="{ transform: `rotate(${row.direction}deg)` }">
+                ↑
+              </div>
               <span v-else>—</span>
             </template>
           </el-table-column>
@@ -438,7 +465,7 @@ onUnmounted(() => {
   padding: 16px 20px;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .realtime-cards {
@@ -455,7 +482,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .card-icon {
@@ -469,12 +496,29 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.card-icon.blue { background: #1890ff; }
-.card-icon.cyan { background: #13c2c2; }
-.card-icon.green { background: #52c41a; }
-.card-icon.orange { background: #faad14; }
-.card-icon.purple { background: #722ed1; }
-.card-icon.gray { background: #8c8c8c; }
+.card-icon.blue {
+  background: #1890ff;
+}
+
+.card-icon.cyan {
+  background: #13c2c2;
+}
+
+.card-icon.green {
+  background: #52c41a;
+}
+
+.card-icon.orange {
+  background: #faad14;
+}
+
+.card-icon.purple {
+  background: #722ed1;
+}
+
+.card-icon.gray {
+  background: #8c8c8c;
+}
 
 .card-value {
   font-size: 24px;
@@ -498,7 +542,7 @@ onUnmounted(() => {
 .card {
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   margin-bottom: 20px;
 }
 

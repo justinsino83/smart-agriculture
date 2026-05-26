@@ -3,29 +3,22 @@
     <!-- 顶部筛选区 -->
     <div class="filter-bar">
       <el-select v-model="selectedSensor" placeholder="选择设备编号" size="large" style="width: 200px">
-        <el-option
-          v-for="sensor in sensors"
-          :key="sensor.id"
-          :label="sensor.deviceCode"
-          :value="sensor.id"
-        />
+        <el-option v-for="sensor in sensors" :key="sensor.id" :label="sensor.deviceCode" :value="sensor.id" />
       </el-select>
-      
-      <el-date-picker
-        v-model="dateRange"
-        type="daterange"
-        range-separator="至"
-        start-placeholder="开始日期"
-        end-placeholder="结束日期"
-        size="large"
-      />
-      
+
+      <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期"
+        end-placeholder="结束日期" size="large" />
+
       <el-button type="primary" size="large" @click="refreshData">
-        <el-icon><Refresh /></el-icon> 刷新数据
+        <el-icon>
+          <Refresh />
+        </el-icon> 刷新数据
       </el-button>
-      
+
       <el-button size="large" @click="exportData">
-        <el-icon><Download /></el-icon> 导出数据
+        <el-icon>
+          <Download />
+        </el-icon> 导出数据
       </el-button>
     </div>
 
@@ -35,7 +28,7 @@
         <h3>实时监测数据</h3>
         <el-tag type="success">数据更新时间: {{ updateTime }}</el-tag>
       </div>
-      
+
       <div class="gauge-grid">
         <div v-for="item in gaugeData" :key="item.name" class="gauge-item">
           <div class="gauge-chart">
@@ -43,20 +36,14 @@
               <div class="gauge-value" :style="{ color: item.color }">{{ item.value }}</div>
               <div class="gauge-unit">{{ item.unit }}</div>
             </div>
-            <el-progress
-              type="dashboard"
-              :percentage="item.percentage"
-              :color="item.color"
-              :stroke-width="10"
-              :width="140"
-              :show-text="false"
-            />
-          </div>          
+            <el-progress type="dashboard" :percentage="item.percentage" :color="item.color" :stroke-width="10"
+              :width="140" :show-text="false" />
+          </div>
           <div class="gauge-info">
-            <div class="gauge-name">{{ item.name }}</div>            
+            <div class="gauge-name">{{ item.name }}</div>
             <div class="gauge-range">
               适宜范围: {{ item.min }}-{{ item.max }}{{ item.unit }}
-            </div>            
+            </div>
             <el-tag :type="getTagType(item.status)" size="small">
               {{ item.statusText }}
             </el-tag>
@@ -68,14 +55,14 @@
     <!-- 历史趋势图 -->
     <div class="section">
       <div class="section-title">
-        <h3>历史趋势分析</h3>        
+        <h3>历史趋势分析</h3>
         <el-radio-group v-model="chartType" size="small">
           <el-radio-button label="day">日</el-radio-button>
           <el-radio-button label="week">周</el-radio-button>
           <el-radio-button label="month">月</el-radio-button>
         </el-radio-group>
-      </div>      
-      
+      </div>
+
       <div ref="trendChart" class="trend-chart"></div>
     </div>
 
@@ -95,42 +82,86 @@
     <div class="section">
       <div class="section-title">
         <h3>监测数据明细</h3>
-      </div>      
-      
-      <el-table :data="tableData" stripe style="width: 100%">
-        <el-table-column prop="time" label="时间" width="180" />
-        <el-table-column prop="moisture" label="土壤湿度(%)" width="120">
+      </div>
+
+      <el-table :data="tableData" stripe style="width: 100%" :cell-style="{ padding: '10px 0' }"
+        :header-cell-style="{ padding: '12px 0', background: '#fafafa', color: '#262626' }">
+        <el-table-column prop="time" label="时间" min-width="170" />
+
+        <el-table-column prop="moisture" label="土壤湿度(%)" min-width="120" align="right">
           <template #default="{ row }">
-            <span :class="getMoistureClass(row.moisture)">{{ row.moisture }}%</span>
+            <span :class="getMoistureClass(row.moisture)" style="padding-right: 15px; font-weight: 500;">{{ row.moisture
+              }}%</span>
           </template>
         </el-table-column>
-        <el-table-column prop="temperature" label="土壤温度(°C)" width="120" />
-        <el-table-column prop="ph" label="pH值" width="100">
+
+        <el-table-column prop="temperature" label="土壤温度(°C)" min-width="120" align="right">
           <template #default="{ row }">
-            <span :class="getPhClass(row.ph)">{{ row.ph }}</span>
+            <span style="padding-right: 15px;">{{ row.temperature }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="ec" label="EC值(mS/cm)" width="130" />
-        <el-table-column prop="nitrogen" label="氮含量(mg/kg)" width="140" />
-        <el-table-column prop="phosphorus" label="磷含量(mg/kg)" width="140" />
-        <el-table-column prop="potassium" label="钾含量(mg/kg)" width="140" />
-        <el-table-column prop="status" label="状态" width="100">
+
+        <el-table-column prop="ph" label="pH值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-tag :type="row.status === '正常' ? 'success' : 'warning'">
-              {{ row.status }}
-            </el-tag>
+            <span :class="getPhClass(row.ph)" style="padding-right: 15px;">{{ row.ph }}</span>
           </template>
         </el-table-column>
-      </el-table>      
-      
+
+        <el-table-column prop="ec" label="EC值(mS/cm)" min-width="130" align="right">
+          <template #default="{ row }">
+            <span style="padding-right: 15px;">{{ row.ec }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="nitrogen" label="氮(mg/kg)" min-width="120" align="right">
+          <template #default="{ row }">
+            <span style="padding-right: 15px;">{{ row.nitrogen }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="phosphorus" label="磷(mg/kg)" min-width="120" align="right">
+          <template #default="{ row }">
+            <span style="padding-right: 15px;">{{ row.phosphorus }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="potassium" label="钾(mg/kg)" min-width="120" align="right">
+          <template #default="{ row }">
+            <span style="padding-right: 15px;">{{ row.potassium }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="健康状态" min-width="300" align="center" fixed="right">
+          <template #default="{ row }">
+            <div style="display: flex; flex-wrap: wrap; gap: 4px; padding: 4px;">
+              <el-tag v-if="row.rawData?.moistureStatus" :type="getStatusType(row.rawData.moistureStatus)" size="small">
+                湿:{{ getStatusText(row.rawData.moistureStatus) }}
+              </el-tag>
+              <el-tag v-if="row.rawData?.temperatureStatus" :type="getStatusType(row.rawData.temperatureStatus)" size="small">
+                温:{{ getStatusText(row.rawData.temperatureStatus) }}
+              </el-tag>
+              <el-tag v-if="row.rawData?.phStatus" :type="getStatusType(row.rawData.phStatus)" size="small">
+                pH:{{ getStatusText(row.rawData.phStatus) }}
+              </el-tag>
+              <el-tag v-if="row.rawData?.ecStatus" :type="getStatusType(row.rawData.ecStatus)" size="small">
+                EC:{{ getStatusText(row.rawData.ecStatus) }}
+              </el-tag>
+              <el-tag v-if="row.rawData?.nitrogenStatus" :type="getStatusType(row.rawData.nitrogenStatus)" size="small">
+                氮:{{ getStatusText(row.rawData.nitrogenStatus) }}
+              </el-tag>
+              <el-tag v-if="row.rawData?.fertilityStatus" :type="getStatusType(row.rawData.fertilityStatus)" size="small">
+                肥:{{ getStatusText(row.rawData.fertilityStatus) }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+
       <div class="pagination">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="total"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next"
-        />
+        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :total="total"
+          :page-sizes="[10, 20, 50, 100]" layout="total, sizes, prev, pager, next"
+          @size-change="(s) => handlePageChange(currentPage, s)"
+          @current-change="(p) => handlePageChange(p, pageSize)" />
       </div>
     </div>
   </div>
@@ -237,27 +268,42 @@ let radarChartInstance = null
 // 初始化趋势图
 const initTrendChart = () => {
   if (!trendChart.value) return
-  
+
   trendChartInstance = echarts.init(trendChart.value)
-  
+
   const option = {
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross' }
+      axisPointer: { type: 'cross' },
+      formatter: (params) => {
+        let result = params[0]?.name + '<br/>'
+        params.forEach(param => {
+          let unit = ''
+          if (param.seriesName === '土壤湿度') unit = '%'
+          else if (param.seriesName === '土壤温度') unit = '°C'
+          else if (param.seriesName === 'pH值') unit = ''
+          else if (param.seriesName === 'EC值') unit = 'mS/cm'
+          else if (param.seriesName === '氮含量') unit = 'mg/kg'
+          else if (param.seriesName === '磷钾含量') unit = 'mg/kg'
+
+          result += `${param.marker} ${param.seriesName}: ${param.value?.toFixed(2)}${unit}<br/>`
+        })
+        return result
+      }
     },
     legend: {
-      data: ['土壤湿度', '土壤温度', 'pH值×10'],
+      data: ['土壤湿度', '土壤温度', 'pH值', 'EC值', '氮含量', '磷钾含量'],
       bottom: 0
     },
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '15%',
+      bottom: '20%',
       containLabel: true
     },
     xAxis: {
       type: 'category',
-      data: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+      data: [],
       axisLine: { lineStyle: { color: '#d9d9d9' } },
       axisLabel: { color: '#8c8c8c' }
     },
@@ -272,10 +318,19 @@ const initTrendChart = () => {
       },
       {
         type: 'value',
-        name: '温度(°C)',
+        name: '温度/EC',
         position: 'right',
+        offset: 40,
         axisLine: { show: true, lineStyle: { color: '#1890ff' } },
         axisLabel: { color: '#1890ff' },
+        splitLine: { show: false }
+      },
+      {
+        type: 'value',
+        name: '养分(mg/kg)',
+        position: 'right',
+        axisLine: { show: true, lineStyle: { color: '#722ed1' } },
+        axisLabel: { color: '#722ed1' },
         splitLine: { show: false }
       }
     ],
@@ -284,7 +339,7 @@ const initTrendChart = () => {
         name: '土壤湿度',
         type: 'line',
         smooth: true,
-        data: [40, 42, 45, 48, 46, 44, 43],
+        data: [],
         itemStyle: { color: '#52c41a' },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -298,21 +353,47 @@ const initTrendChart = () => {
         type: 'line',
         smooth: true,
         yAxisIndex: 1,
-        data: [20, 21, 23, 26, 25, 23, 21],
+        data: [],
         itemStyle: { color: '#1890ff' }
       },
       {
-        name: 'pH值×10',
+        name: 'pH值',
         type: 'line',
         smooth: true,
         yAxisIndex: 1,
-        data: [66, 67, 68, 69, 68, 67, 67],
+        data: [],
         itemStyle: { color: '#faad14' },
+        lineStyle: { type: 'dashed' }
+      },
+      {
+        name: 'EC值',
+        type: 'line',
+        smooth: true,
+        yAxisIndex: 1,
+        data: [],
+        itemStyle: { color: '#13c2c2' },
+        lineStyle: { type: 'dotted' }
+      },
+      {
+        name: '氮含量',
+        type: 'line',
+        smooth: true,
+        yAxisIndex: 2,
+        data: [],
+        itemStyle: { color: '#722ed1' }
+      },
+      {
+        name: '磷钾含量',
+        type: 'line',
+        smooth: true,
+        yAxisIndex: 2,
+        data: [],
+        itemStyle: { color: '#eb2f96' },
         lineStyle: { type: 'dashed' }
       }
     ]
   }
-  
+
   trendChartInstance.setOption(option)
 }
 
@@ -338,7 +419,13 @@ async function updateRadarChart() {
     const radarData = selectedSensors.map((sensor, index) => {
       const data = realtimeDataList[index]
       if (!data) {
-        return { value: [0, 0, 0, 0, 0], name: sensor.deviceCode, itemStyle: { color: getRadarColor(index) }, areaStyle: { opacity: 0.2 } }
+        return {
+          value: [0, 0, 0, 0, 0],
+          name: sensor.deviceCode,
+          itemStyle: { color: getRadarColor(index) },
+          areaStyle: { opacity: 0.2 },
+          rawData: null
+        }
       }
 
       // 各指标评分计算
@@ -354,12 +441,27 @@ async function updateRadarChart() {
         value: [moistureScore, phScore, fertilityScore, tempScore, ecScore],
         name: sensor.deviceCode,
         itemStyle: { color: getRadarColor(index) },
-        areaStyle: { opacity: 0.2 }
+        areaStyle: { opacity: 0.2 },
+        rawData: data
       }
     })
 
     const option = {
-      tooltip: {},
+      tooltip: {
+        formatter: (params) => {
+          const dataItem = params.data
+          const rawData = dataItem?.rawData
+          let result = `<strong>${dataItem.name}</strong><br/>`
+
+          result += `湿度评分: ${dataItem.value[0].toFixed(1)} (${rawData?.moisture?.toFixed(1)}%)<br/>`
+          result += `pH适宜度: ${dataItem.value[1].toFixed(1)} (${rawData?.ph?.toFixed(1)})<br/>`
+          result += `肥力综合: ${dataItem.value[2].toFixed(1)} (N:${rawData?.nitrogen?.toFixed(1) || 0} P:${rawData?.phosphorus?.toFixed(1) || 0} K:${rawData?.potassium?.toFixed(1) || 0})<br/>`
+          result += `温度适宜: ${dataItem.value[3].toFixed(1)} (${rawData?.temperature?.toFixed(1)}°C)<br/>`
+          result += `EC健康度: ${dataItem.value[4].toFixed(1)} (${rawData?.ec?.toFixed(1)} mS/cm)`
+
+          return result
+        }
+      },
       legend: {
         data: selectedSensors.map(s => s.deviceCode),
         bottom: 0
@@ -381,7 +483,7 @@ async function updateRadarChart() {
       series: [{ type: 'radar', data: radarData }]
     }
 
-    radarChartInstance.setOption(option)
+    radarChartInstance.setOption(option, true)
   } catch (e) {
     console.error('更新雷达图失败', e)
   }
@@ -481,24 +583,57 @@ async function loadHistoryData() {
     const sensorId = selectedSensor.value
     const now = new Date()
     const end = now.toISOString()
-    const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    const history = await soilApi.getHistoryData(sensorId, start, end)
-    tableData.value = (history || []).map(item => ({
-      time: item.collectTime ? item.collectTime.replace('T', ' ').substring(0, 19) : '',
-      moisture: item.moisture ?? 0,
-      temperature: item.temperature ?? 0,
-      ph: item.ph ?? 0,
-      ec: item.ec ?? 0,
-      nitrogen: item.nitrogen ?? 0,
-      phosphorus: item.phosphorus ?? 0,
-      potassium: item.potassium ?? 0,
-      status: item.healthStatus === 'good' ? '正常' : '预警'
-    }))
-    total.value = tableData.value.length
+    const history = await soilApi.getHistoryDataPage(sensorId, start, end, currentPage.value, pageSize.value)
+    if (history && history.list) {
+      tableData.value = (history.list || []).map(item => ({
+        time: item.collectTime ? item.collectTime.replace('T', ' ').substring(0, 19) : '',
+        moisture: item.moisture ?? 0,
+        temperature: item.temperature ?? 0,
+        ph: item.ph ?? 0,
+        ec: item.ec ?? 0,
+        nitrogen: item.nitrogen ?? 0,
+        phosphorus: item.phosphorus ?? 0,
+        potassium: item.potassium ?? 0,
+        healthStatus: item.healthStatus,
+        // 保存原始数据用于详细状态显示
+        rawData: item
+      }))
+      total.value = history.total ?? 0
+    }
   } catch (e) {
+    console.error('加载历史数据失败', e)
     ElMessage.error('加载历史数据失败')
   }
+}
+
+// 状态映射函数
+function getStatusText(status) {
+  switch (status) {
+    case 'optimal': return '最佳'
+    case 'good': return '良好'
+    case 'poor': return '较差'
+    default: return '未知'
+  }
+}
+
+function getStatusType(status) {
+  switch (status) {
+    case 'optimal': return 'success'
+    case 'good': return 'primary'
+    case 'poor': return 'warning'
+    default: return 'info'
+  }
+}
+
+// 分页变化处理
+function handlePageChange(page, size) {
+  currentPage.value = page
+  if (size && size !== pageSize.value) {
+    pageSize.value = size
+  }
+  loadHistoryData()
 }
 
 async function loadTrendData() {
@@ -526,12 +661,33 @@ function initTrendChartWithData(trend) {
 
   const moistureList = trend.moisture || []
   const tempList = trend.temperature || []
-  const phList = (trend.ph || []).map(v => v * 10)
+  const phList = trend.ph || []
+  const ecList = trend.ec || []
+  const nitrogenList = trend.nitrogen || []
+  const npkList = trend.npk || []
 
   const option = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-    legend: { data: ['土壤湿度', '土壤温度', 'pH值×10'], bottom: 0 },
-    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      formatter: (params) => {
+        let result = params[0].name + '<br/>'
+        params.forEach(param => {
+          let unit = ''
+          if (param.seriesName === '土壤湿度') unit = '%'
+          else if (param.seriesName === '土壤温度') unit = '°C'
+          else if (param.seriesName === 'pH值') unit = ''
+          else if (param.seriesName === 'EC值') unit = 'mS/cm'
+          else if (param.seriesName === '氮含量') unit = 'mg/kg'
+          else if (param.seriesName === '磷钾含量') unit = 'mg/kg'
+
+          result += `${param.marker} ${param.seriesName}: ${param.value.toFixed(2)}${unit}<br/>`
+        })
+        return result
+      }
+    },
+    legend: { data: ['土壤湿度', '土壤温度', 'pH值', 'EC值', '氮含量', '磷钾含量'], bottom: 0 },
+    grid: { left: '3%', right: '4%', bottom: '20%', containLabel: true },
     xAxis: {
       type: 'category',
       data: trend._timeLabels || Array.from({ length: moistureList.length }, (_, i) => `${i}:00`),
@@ -540,12 +696,16 @@ function initTrendChartWithData(trend) {
     },
     yAxis: [
       { type: 'value', name: '湿度(%)', position: 'left', axisLine: { show: true, lineStyle: { color: '#52c41a' } }, axisLabel: { color: '#52c41a' }, splitLine: { lineStyle: { color: '#f0f0f0' } } },
-      { type: 'value', name: '温度(°C)', position: 'right', axisLine: { show: true, lineStyle: { color: '#1890ff' } }, axisLabel: { color: '#1890ff' }, splitLine: { show: false } }
+      { type: 'value', name: '温度/EC', position: 'right', offset: 40, axisLine: { show: true, lineStyle: { color: '#1890ff' } }, axisLabel: { color: '#1890ff' }, splitLine: { show: false } },
+      { type: 'value', name: '养分(mg/kg)', position: 'right', axisLine: { show: true, lineStyle: { color: '#722ed1' } }, axisLabel: { color: '#722ed1' }, splitLine: { show: false } }
     ],
     series: [
       { name: '土壤湿度', type: 'line', smooth: true, data: moistureList, itemStyle: { color: '#52c41a' }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(82, 196, 26, 0.3)' }, { offset: 1, color: 'rgba(82, 196, 26, 0.05)' }]) } },
       { name: '土壤温度', type: 'line', smooth: true, yAxisIndex: 1, data: tempList, itemStyle: { color: '#1890ff' } },
-      { name: 'pH值×10', type: 'line', smooth: true, yAxisIndex: 1, data: phList, itemStyle: { color: '#faad14' }, lineStyle: { type: 'dashed' } }
+      { name: 'pH值', type: 'line', smooth: true, yAxisIndex: 1, data: phList, itemStyle: { color: '#faad14' }, lineStyle: { type: 'dashed' } },
+      { name: 'EC值', type: 'line', smooth: true, yAxisIndex: 1, data: ecList, itemStyle: { color: '#13c2c2' }, lineStyle: { type: 'dotted' } },
+      { name: '氮含量', type: 'line', smooth: true, yAxisIndex: 2, data: nitrogenList, itemStyle: { color: '#722ed1' } },
+      { name: '磷钾含量', type: 'line', smooth: true, yAxisIndex: 2, data: npkList, itemStyle: { color: '#eb2f96' }, lineStyle: { type: 'dashed' } }
     ]
   }
 

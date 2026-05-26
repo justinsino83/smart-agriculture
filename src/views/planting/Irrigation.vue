@@ -3,7 +3,9 @@
     <!-- 第一行：顶部概览 -->
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-icon blue"><el-icon><Watermelon /></el-icon></div>
+        <div class="stat-icon blue"><el-icon>
+            <Watermelon />
+          </el-icon></div>
         <div class="stat-content">
           <div class="stat-value">{{ statsData.totalDevices || 0 }}<span class="unit">个</span></div>
           <div class="stat-label">设备总数</div>
@@ -12,7 +14,9 @@
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon green"><el-icon><CircleCheck /></el-icon></div>
+        <div class="stat-icon green"><el-icon>
+            <CircleCheck />
+          </el-icon></div>
         <div class="stat-content">
           <div class="stat-value">{{ statsData.todayCount || 0 }}<span class="unit">次</span></div>
           <div class="stat-label">今日灌溉</div>
@@ -21,7 +25,9 @@
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon orange"><el-icon><Timer /></el-icon></div>
+        <div class="stat-icon orange"><el-icon>
+            <Timer />
+          </el-icon></div>
         <div class="stat-content">
           <div class="stat-value">{{ statsData.runningCount || 0 }}<span class="unit">个</span></div>
           <div class="stat-label">执行中任务</div>
@@ -30,7 +36,9 @@
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon cyan"><el-icon><TrendCharts /></el-icon></div>
+        <div class="stat-icon cyan"><el-icon>
+            <TrendCharts />
+          </el-icon></div>
         <div class="stat-content">
           <div class="stat-value">{{ statsData.savingRate || 0 }}%</div>
           <div class="stat-label">节水率</div>
@@ -73,31 +81,36 @@
         </el-button>
       </div>
       <div class="card-body">
-        <el-table :data="devices" stripe style="width: 100%" v-loading="loading">
-          <el-table-column prop="deviceName" label="设备名称" width="120" />
-          <el-table-column prop="deviceCode" label="设备编号" width="100" />
-          <el-table-column prop="location" label="位置" min-width="100" />
-          <el-table-column prop="flowRate" label="流量(m³/h)" width="90" />
-          <el-table-column prop="totalRunTime" label="累计运行时长" width="100">
+        <el-table :data="devices" stripe style="width: 100%" v-loading="loading" :cell-style="{ padding: '10px 0' }"
+          :header-cell-style="{ padding: '12px 0', background: '#fafafa', color: '#262626' }">
+          <el-table-column prop="deviceName" label="设备名称" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="deviceCode" label="设备编号" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="location" label="位置" min-width="150" show-overflow-tooltip />
+
+          <el-table-column prop="flowRate" label="流量(m³/h)" min-width="110" align="right">
             <template #default="{ row }">
-              {{ row.totalRunTime || 0 }}分钟
+              <span style="padding-right: 15px; font-weight: 500;">{{ row.flowRate }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="80">
+
+          <el-table-column prop="totalRunTime" label="累计运行时长" min-width="140" align="right">
+            <template #default="{ row }">
+              <span style="padding-right: 15px;">{{ row.totalRunTime || 0 }} 分钟</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="status" label="状态" min-width="100" align="center">
             <template #default="{ row }">
               <el-tag :type="getStatusType(row.status)" size="small">
                 {{ getStatusText(row.status) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
+
+          <el-table-column label="操作" width="100" fixed="right" align="center">
             <template #default="{ row }">
-              <el-switch
-                v-model="row.status"
-                :active-value="2"
-                :inactive-value="1"
-                @change="(val) => toggleDevice(row, val)"
-              />
+              <el-switch v-model="row.status" :active-value="2" :inactive-value="1"
+                @change="(val) => toggleDevice(row, val)" />
             </template>
           </el-table-column>
         </el-table>
@@ -116,41 +129,49 @@
         </el-radio-group>
       </div>
       <div class="card-body">
-        <el-table :data="filteredTasks" stripe style="width: 100%" v-loading="taskLoading">
-          <el-table-column prop="taskName" label="任务名称" min-width="120" />
-          <el-table-column prop="deviceId" label="设备ID" width="80" />
-          <el-table-column prop="planStartTime" label="计划开始" width="160">
+        <el-table :data="filteredTasks" stripe style="width: 100%" v-loading="taskLoading"
+          :cell-style="{ padding: '10px 0' }"
+          :header-cell-style="{ padding: '12px 0', background: '#fafafa', color: '#262626' }">
+          <el-table-column prop="taskName" label="任务名称" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="deviceId" label="设备ID" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="planStartTime" label="计划开始" min-width="160" />
+
+          <el-table-column prop="duration" label="计划时长" min-width="110" align="right">
             <template #default="{ row }">
-              {{ formatDateTime(row.planStartTime) }}
+              <span style="padding-right: 15px;">{{ row.duration }} 分钟</span>
             </template>
           </el-table-column>
-          <el-table-column prop="duration" label="计划时长" width="80">
+
+          <el-table-column prop="waterUsage" label="用水量" min-width="110" align="right">
             <template #default="{ row }">
-              {{ row.duration }}分钟
+              <span style="padding-right: 15px; color: #1890ff; font-weight: 500;">
+                {{ row.waterUsage ? row.waterUsage + ' m³' : '-' }}
+              </span>
             </template>
           </el-table-column>
-          <el-table-column prop="waterUsage" label="用水量" width="80">
-            <template #default="{ row }">
-              {{ row.waterUsage ? row.waterUsage + 'm³' : '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="triggerType" label="触发方式" width="80">
+
+          <el-table-column prop="triggerType" label="触发方式" min-width="100" align="center">
             <template #default="{ row }">
               {{ row.triggerType === 1 ? '手动' : '自动' }}
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="80">
+
+          <el-table-column prop="status" label="状态" min-width="100" align="center">
             <template #default="{ row }">
               <el-tag :type="getTaskStatusType(row.status)" size="small">
                 {{ getTaskStatusText(row.status) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="140" fixed="right">
+
+          <el-table-column label="操作" width="160" fixed="right" align="center">
             <template #default="{ row }">
-              <el-button v-if="row.status === 0" type="primary" size="small" link @click="executeTask(row.id)">执行</el-button>
-              <el-button v-if="row.status === 1" type="success" size="small" link @click="completeTask(row.id)">完成</el-button>
-              <el-button v-if="row.status === 0" type="danger" size="small" link @click="cancelTask(row.id)">取消</el-button>
+              <el-button v-if="row.status === 0" type="primary" size="small" link
+                @click="executeTask(row.id)">执行</el-button>
+              <el-button v-if="row.status === 1" type="success" size="small" link
+                @click="completeTask(row.id)">完成</el-button>
+              <el-button v-if="row.status === 0" type="danger" size="small" link
+                @click="cancelTask(row.id)">取消</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -171,12 +192,7 @@
         </el-form-item>
 
         <el-form-item label="开始时间">
-          <el-date-picker
-            v-model="scheduleForm.startTime"
-            type="datetime"
-            placeholder="选择开始时间"
-            style="width: 100%"
-          />
+          <el-date-picker v-model="scheduleForm.startTime" type="datetime" placeholder="选择开始时间" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="灌溉时长">
@@ -342,7 +358,7 @@ async function loadWaterStatistics() {
     const days = waterStatType.value === 'week' ? 7 : 30
     const trend = await irrigationApi.getTrend(days)
     if (trend && trend.length > 0) updateWaterChart(trend)
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function updateWaterChart(trend) {
@@ -471,10 +487,21 @@ watch(() => statsData.value, () => {
   color: #fff;
 }
 
-.stat-icon.blue { background: #1890ff; }
-.stat-icon.green { background: #52c41a; }
-.stat-icon.orange { background: #faad14; }
-.stat-icon.cyan { background: #13c2c2; }
+.stat-icon.blue {
+  background: #1890ff;
+}
+
+.stat-icon.green {
+  background: #52c41a;
+}
+
+.stat-icon.orange {
+  background: #faad14;
+}
+
+.stat-icon.cyan {
+  background: #13c2c2;
+}
 
 .stat-value {
   font-size: 28px;
