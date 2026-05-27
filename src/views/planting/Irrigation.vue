@@ -114,6 +114,12 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="pagination">
+          <el-pagination v-model:current-page="devicePage" v-model:page-size="devicePageSize" :total="deviceTotal"
+            :page-sizes="[5, 10, 20, 50]" layout="total, sizes, prev, pager, next"
+            @size-change="(s) => handleDevicePageChange(devicePage, s)"
+            @current-change="(p) => handleDevicePageChange(p, devicePageSize)" />
+        </div>
       </div>
     </div>
 
@@ -129,7 +135,7 @@
         </el-radio-group>
       </div>
       <div class="card-body">
-        <el-table :data="filteredTasks" stripe style="width: 100%" v-loading="taskLoading"
+        <el-table :data="tasks" stripe style="width: 100%" v-loading="taskLoading"
           :cell-style="{ padding: '10px 0' }"
           :header-cell-style="{ padding: '12px 0', background: '#fafafa', color: '#262626' }">
           <el-table-column prop="taskName" label="任务名称" min-width="150" show-overflow-tooltip />
@@ -175,6 +181,12 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="pagination">
+          <el-pagination v-model:current-page="taskPage" v-model:page-size="taskPageSize" :total="taskTotal"
+            :page-sizes="[5, 10, 20, 50]" layout="total, sizes, prev, pager, next"
+            @size-change="(s) => handleTaskPageChange(taskPage, s)"
+            @current-change="(p) => handleTaskPageChange(p, taskPageSize)" />
+        </div>
       </div>
     </div>
 
@@ -203,7 +215,7 @@
         <el-form-item label="触发条件">
           <el-radio-group v-model="scheduleForm.trigger">
             <el-radio label="manual">手动</el-radio>
-            <el-radio label="auto">自动（土壤湿度&lt;30%）</el-radio>
+            <el-radio label="auto">自动（土壤湿度<30%）</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -237,17 +249,22 @@ const statsData = ref({})
 const devices = ref([])
 const tasks = ref([])
 
+// 设备分页
+const devicePage = ref(1)
+const devicePageSize = ref(10)
+const deviceTotal = ref(0)
+
+// 任务分页
+const taskPage = ref(1)
+const taskPageSize = ref(10)
+const taskTotal = ref(0)
+
 const scheduleForm = reactive({
   name: '',
   device: '',
   startTime: null,
   duration: 30,
   trigger: 'manual'
-})
-
-const filteredTasks = computed(() => {
-  if (taskFilter.value === 'all') return tasks.value
-  return tasks.value.filter(t => String(t.status) === taskFilter.value)
 })
 
 function getStatusType(status) {
@@ -323,13 +340,24 @@ const initDeviceStatusChart = () => {
 async function loadDevices() {
   try {
     loading.value = true
-    const res = await irrigationApi.getDevices()
-    devices.value = res || []
+    const res = await irrigationApi.getDevicesPage(devicePage.value, devicePageSize.value)
+    if (res && res.list) {
+      devices.value = res.list
+      deviceTotal.value = res.total || 0
+    }
   } catch (e) {
     ElMessage.error('加载设备失败')
   } finally {
     loading.value = false
   }
+}
+
+function handleDevicePageChange(page, size) {
+  devicePage.value = page
+  if (size && size !== devicePageSize.value) {
+    devicePageSize.value = size
+  }
+  loadDevices()
 }
 
 async function loadStats() {
@@ -344,13 +372,25 @@ async function loadStats() {
 async function loadTasks() {
   try {
     taskLoading.value = true
-    const res = await irrigationApi.getTasks()
-    tasks.value = res || []
+    const status = taskFilter.value === 'all' ? null : parseInt(taskFilter.value)
+    const res = await irrigationApi.getTasksPage(taskPage.value, taskPageSize.value, status)
+    if (res && res.list) {
+      tasks.value = res.list
+      taskTotal.value = res.total || 0
+    }
   } catch (e) {
     console.error('加载任务失败', e)
   } finally {
     taskLoading.value = false
   }
+}
+
+function handleTaskPageChange(page, size) {
+  taskPage.value = page
+  if (size && size !== taskPageSize.value) {
+    taskPageSize.value = size
+  }
+  loadTasks()
 }
 
 async function loadWaterStatistics() {
@@ -365,10 +405,11 @@ function updateWaterChart(trend) {
   if (!waterChartInstance) return
   const labels = trend.map(t => t.date || '')
   const waterData = trend.map(t => t.water || 0)
+  const plannedWaterData = trend.map(t => t.plannedWater || 0)
   waterChartInstance.setOption({
     xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: '#d9d9d9' } } },
     series: [
-      { name: '计划用水', type: 'bar', data: waterData.map(v => Math.round(v * 1.2 * 10) / 10), itemStyle: { color: '#d9d9d9' }, barWidth: '35%' },
+      { name: '计划用水', type: 'bar', data: plannedWaterData, itemStyle: { color: '#d9d9d9' }, barWidth: '35%' },
       { name: '实际用水', type: 'bar', data: waterData, itemStyle: { color: '#1890ff' }, barWidth: '35%' }
     ]
   })
@@ -436,6 +477,12 @@ const cancelTask = async (taskId) => {
     ElMessage.error('取消失败: ' + e.message)
   }
 }
+
+// 监听任务过滤器变化
+watch(taskFilter, (newVal) => {
+  taskPage.value = 1
+  loadTasks()
+})
 
 onMounted(async () => {
   initWaterChart()
@@ -572,6 +619,12 @@ watch(() => statsData.value, () => {
 .unit {
   margin-left: 8px;
   color: #8c8c8c;
+}
+
+.pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 @media (max-width: 1200px) {

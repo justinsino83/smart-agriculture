@@ -126,9 +126,11 @@ export const soilApi = {
 // Irrigation APIs
 export const irrigationApi = {
   getDevices: () => api.get('/api/irrigation/devices'),
+  getDevicesPage: (page = 1, size = 10) => api.get('/api/irrigation/devices/page', { params: { page, size } }),
   getDeviceDetail: (deviceId) => api.get(`/api/irrigation/device/${deviceId}`),
   controlDevice: (deviceId, on) => api.post(`/api/irrigation/device/${deviceId}/control`, null, { params: { on } }),
   getTasks: () => api.get('/api/irrigation/tasks'),
+  getTasksPage: (page = 1, size = 10, status = null) => api.get('/api/irrigation/tasks/page', { params: { page, size, status } }),
   createTask: (task) => api.post('/api/irrigation/task', task),
   getStatistics: (period = 'day') => api.get('/api/irrigation/statistics', { params: { period } }),
   getTrend: (days = 7) => api.get('/api/irrigation/trend', { params: { days } })

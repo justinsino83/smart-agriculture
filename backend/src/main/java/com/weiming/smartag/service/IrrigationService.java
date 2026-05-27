@@ -18,6 +18,11 @@ public interface IrrigationService extends IService<IrrigationDevice> {
     List<IrrigationDevice> listDevices();
     
     /**
+     * 分页获取灌溉设备
+     */
+    Map<String, Object> listDevicesPage(int page, int size);
+    
+    /**
      * 控制设备开关
      */
     boolean controlDevice(Long deviceId, Boolean on);
@@ -26,6 +31,11 @@ public interface IrrigationService extends IService<IrrigationDevice> {
      * 获取灌溉任务列表
      */
     List<IrrigationTask> listTasks();
+    
+    /**
+     * 分页获取灌溉任务
+     */
+    Map<String, Object> listTasksPage(int page, int size, Integer status);
     
     /**
      * 创建灌溉任务

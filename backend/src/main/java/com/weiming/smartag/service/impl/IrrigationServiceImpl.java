@@ -30,6 +30,30 @@ public class IrrigationServiceImpl extends ServiceImpl<IrrigationDeviceMapper, I
     }
     
     @Override
+    public Map<String, Object> listDevicesPage(int page, int size) {
+        try {
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<IrrigationDevice> pageObj = 
+                    new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<IrrigationDevice> result = 
+                    baseMapper.selectPage(pageObj, null);
+            
+            Map<String, Object> data = new HashMap<>();
+            data.put("list", result.getRecords());
+            data.put("total", result.getTotal());
+            data.put("page", page);
+            data.put("size", size);
+            return data;
+        } catch (Exception e) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("list", new ArrayList<>());
+            data.put("total", 0L);
+            data.put("page", page);
+            data.put("size", size);
+            return data;
+        }
+    }
+    
+    @Override
     public boolean controlDevice(Long deviceId, Boolean on) {
         IrrigationDevice device = getById(deviceId);
         if (device == null) return false;
@@ -56,6 +80,38 @@ public class IrrigationServiceImpl extends ServiceImpl<IrrigationDeviceMapper, I
     @Override
     public List<IrrigationTask> listTasks() {
         return taskMapper.selectList(null);
+    }
+    
+    @Override
+    public Map<String, Object> listTasksPage(int page, int size, Integer status) {
+        try {
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<IrrigationTask> pageObj = 
+                    new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+            
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<IrrigationTask> wrapper = 
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            if (status != null) {
+                wrapper.eq(IrrigationTask::getStatus, status);
+            }
+            wrapper.orderByDesc(IrrigationTask::getCreateTime);
+            
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<IrrigationTask> result = 
+                    taskMapper.selectPage(pageObj, wrapper);
+            
+            Map<String, Object> data = new HashMap<>();
+            data.put("list", result.getRecords());
+            data.put("total", result.getTotal());
+            data.put("page", page);
+            data.put("size", size);
+            return data;
+        } catch (Exception e) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("list", new ArrayList<>());
+            data.put("total", 0L);
+            data.put("page", page);
+            data.put("size", size);
+            return data;
+        }
     }
     
     @Override
@@ -175,6 +231,10 @@ public class IrrigationServiceImpl extends ServiceImpl<IrrigationDeviceMapper, I
                 .filter(t -> t.getStatus() == 2 && t.getActualEndTime() != null)
                 .collect(Collectors.toList());
 
+        // 获取所有设备信息
+        Map<Long, IrrigationDevice> deviceMap = new HashMap<>();
+        listDevices().forEach(d -> deviceMap.put(d.getId(), d));
+
         // 按日期分组统计
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
 
@@ -182,14 +242,31 @@ public class IrrigationServiceImpl extends ServiceImpl<IrrigationDeviceMapper, I
             LocalDateTime date = LocalDateTime.now().minusDays(i);
             String dateStr = date.format(formatter);
 
-            double water = tasks.stream()
+            // 统计实际用水量
+            double actualWater = tasks.stream()
                     .filter(t -> t.getActualEndTime().toLocalDate().equals(date.toLocalDate()))
                     .mapToDouble(t -> t.getWaterUsage() != null ? t.getWaterUsage() : 0)
                     .sum();
 
+            // 统计计划用水量（根据设备流量和计划时长计算）
+            double plannedWater = tasks.stream()
+                    .filter(t -> t.getActualEndTime().toLocalDate().equals(date.toLocalDate()))
+                    .mapToDouble(t -> {
+                        if (t.getDeviceId() != null && t.getDuration() != null) {
+                            IrrigationDevice device = deviceMap.get(t.getDeviceId());
+                            if (device != null && device.getFlowRate() != null) {
+                                // 计划用水量 = 设备流量(m³/h) * 计划时长(分钟) / 60
+                                return device.getFlowRate() * t.getDuration() / 60.0;
+                            }
+                        }
+                        return 0;
+                    })
+                    .sum();
+
             Map<String, Object> dayData = new HashMap<>();
             dayData.put("date", dateStr);
-            dayData.put("water", Math.round(water * 10) / 10.0);
+            dayData.put("water", Math.round(actualWater * 10) / 10.0);
+            dayData.put("plannedWater", Math.round(plannedWater * 10) / 10.0);
             trend.add(dayData);
         }
 

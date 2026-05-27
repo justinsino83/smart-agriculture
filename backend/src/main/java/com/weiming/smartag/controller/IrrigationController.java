@@ -38,6 +38,21 @@ public class IrrigationController {
     }
     
     /**
+     * 分页获取灌溉设备
+     */
+    @GetMapping("/devices/page")
+    public Result<Map<String, Object>> listDevicesPage(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        try {
+            return Result.success(irrigationService.listDevicesPage(page, size));
+        } catch (Exception e) {
+            log.error("获取灌溉设备分页列表失败", e);
+            return Result.fail("获取设备列表失败: " + e.getMessage());
+        }
+    }
+    
+    /**
      * 获取设备详情
      */
     @GetMapping("/device/{deviceId}")
@@ -81,6 +96,22 @@ public class IrrigationController {
             return Result.success(irrigationService.listTasks());
         } catch (Exception e) {
             log.error("获取灌溉任务列表失败", e);
+            return Result.fail("获取任务列表失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 分页获取灌溉任务列表
+     */
+    @GetMapping("/tasks/page")
+    public Result<Map<String, Object>> listTasksPage(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Integer status) {
+        try {
+            return Result.success(irrigationService.listTasksPage(page, size, status));
+        } catch (Exception e) {
+            log.error("获取灌溉任务分页列表失败", e);
             return Result.fail("获取任务列表失败: " + e.getMessage());
         }
     }
