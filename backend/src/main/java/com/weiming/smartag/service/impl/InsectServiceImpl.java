@@ -366,11 +366,12 @@ public class InsectServiceImpl implements InsectService {
     }
 
     @Override
-    public IPage<InsectData> getLocalDataPage(String imei, String startDate, String endDate, int page, int size) {
+    public IPage<InsectData> getLocalDataPage(String imei, String startDate, String endDate, Boolean hasObjectCount, int page, int size) {
         QueryWrapper<InsectData> q = new QueryWrapper<>();
         if (imei != null && !imei.isEmpty()) q.eq("imei", imei);
         if (startDate != null) q.ge("record_time", startDate);
         if (endDate != null) q.le("record_time", endDate);
+        if (hasObjectCount != null && hasObjectCount) q.gt("object_count", 0);
         q.orderByDesc("record_time");
         return insectDataMapper.selectPage(new Page<>(page, size), q);
     }

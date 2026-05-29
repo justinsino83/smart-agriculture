@@ -20,5 +20,5 @@ public interface InsectService {
     void syncAllDevicesData();
     void syncDeviceData(String imei);
     IPage<InsectDevice> getLocalDevicePage(int page, int size);
-    IPage<InsectData> getLocalDataPage(String imei, String startDate, String endDate, int page, int size);
+    IPage<InsectData> getLocalDataPage(String imei, String startDate, String endDate, Boolean hasObjectCount, int page, int size);
 }

@@ -94,6 +94,7 @@ public class InsectController {
             @RequestParam(required = false) String imei,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Boolean hasObjectCount,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         try {
@@ -101,9 +102,9 @@ public class InsectController {
             if (page < 1) page = 1;
             if (size < 1 || size > 100) size = 20;
             
-            return Result.success(insectService.getLocalDataPage(imei, startDate, endDate, page, size));
+            return Result.success(insectService.getLocalDataPage(imei, startDate, endDate, hasObjectCount, page, size));
         } catch (Exception e) {
-            log.error("获取虫情数据列表失败, imei: {}, startDate: {}, endDate: {}, page: {}, size: {}", imei, startDate, endDate, page, size, e);
+            log.error("获取虫情数据列表失败, imei: {}, startDate: {}, endDate: {}, hasObjectCount: {}, page: {}, size: {}", imei, startDate, endDate, hasObjectCount, page, size, e);
             return Result.fail("获取数据失败: " + e.getMessage());
         }
     }
