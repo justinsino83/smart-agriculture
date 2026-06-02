@@ -32,6 +32,10 @@ public class WeatherData {
 
     private Double pressure;
 
+    private Double totalRadiation;
+
+    private String windDirectionText;
+
     private String weatherCode;
 
     private LocalDateTime collectTime;

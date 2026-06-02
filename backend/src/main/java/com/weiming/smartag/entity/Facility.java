@@ -28,6 +28,8 @@ public class Facility {
     private Integer status;
     
     private String description;
+
+    private String insectDeviceId;
     
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

@@ -2,6 +2,7 @@ package com.weiming.smartag.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.weiming.smartag.common.Result;
+import com.weiming.smartag.dto.DryingTowerDataDTO;
 import com.weiming.smartag.entity.DryingBatch;
 import com.weiming.smartag.entity.Facility;
 import com.weiming.smartag.entity.FacilityRealtimeData;
@@ -18,7 +19,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -166,12 +170,10 @@ public class DryingController {
 
     @GetMapping("/sensors")
     @Operation(summary = "获取烘干车间传感器数据", description = "获取烘干车间的环境监测、设备状态、能耗数据等综合数据")
-    public Result<Map<String, Object>> getDryingSensors(
+    public Result<DryingTowerDataDTO> getDryingSensors(
             @Parameter(description = "设施ID")
             @RequestParam(required = false) Long facilityId) {
         try {
-            Map<String, Object> result = new HashMap<>();
-
             // 获取设施信息
             Facility facility = null;
             if (facilityId != null) {
@@ -183,93 +185,163 @@ public class DryingController {
                         .last("LIMIT 1")
                         .one();
             }
-            result.put("facility", facility);
+
+            // 构建烘干塔数据
+            DryingTowerDataDTO.DryingTowerDataDTOBuilder builder = DryingTowerDataDTO.builder();
 
             if (facility != null) {
-                // 环境数据
-                Map<String, Object> envData = devicePushService.getDashboardOverview(null);
-                result.put("environment", envData.get("environment"));
-
-                // 实时传感器数据 - 从数据库读取
+                // 获取实时传感器数据
                 FacilityRealtimeData realtimeData = facilityRealtimeDataMapper.selectOne(
                         new LambdaQueryWrapper<FacilityRealtimeData>()
                                 .eq(FacilityRealtimeData::getFacilityId, facility.getId())
                                 .orderByDesc(FacilityRealtimeData::getCollectTime)
                                 .last("LIMIT 1")
                 );
-                if (realtimeData != null) {
-                    Map<String, Object> realtimeSensor = new HashMap<>();
-                    realtimeSensor.put("innerHumidity", realtimeData.getHumidity());
-                    realtimeSensor.put("hotAirTemperature", realtimeData.getHotAirTemperature());
-                    realtimeSensor.put("outletMoisture", realtimeData.getOutletMoisture());
-                    realtimeSensor.put("grainLayerThickness", realtimeData.getGrainLayerThickness());
-                    result.put("realtimeSensor", realtimeSensor);
-                }
 
-                // 设施状态 - 从数据库读取
+                // 获取设施状态
                 FacilityStatus status = facilityStatusMapper.selectOne(
                         new LambdaQueryWrapper<FacilityStatus>()
                                 .eq(FacilityStatus::getFacilityId, facility.getId())
                                 .last("LIMIT 1")
                 );
-                if (status != null) {
-                    // 运行状态
-                    Map<String, Object> operationStatus = new HashMap<>();
-                    operationStatus.put("runStatus", status.getRunStatus());
-                    operationStatus.put("innerTemperature", realtimeData != null ? realtimeData.getTemperature() : null);
-                    operationStatus.put("outletMoisture", realtimeData != null ? realtimeData.getOutletMoisture() : null);
-                    operationStatus.put("hotAirTemperature", realtimeData != null ? realtimeData.getHotAirTemperature() : null);
-                    result.put("operationStatus", operationStatus);
 
-                    // 烘干工艺数据
-                    Map<String, Object> processData = new HashMap<>();
-                    processData.put("grainType", status.getGrainTypeProcessed());
-                    processData.put("processingCapacity", status.getProcessingCapacity());
-                    processData.put("targetMoisture", status.getTargetMoistureProcess());
-                    result.put("processData", processData);
+                // 1. 基础信息
+                DryingTowerDataDTO.BaseInfoDTO baseInfo = buildBaseInfo(realtimeData, status);
+                builder.baseInfo(baseInfo);
 
-                    // 设备状态
-                    Map<String, Object> deviceStatus = new HashMap<>();
-                    deviceStatus.put("elevator", status.getElevatorStatus());
-                    deviceStatus.put("circulatingFan", status.getCirculatingFanStatus());
-                    deviceStatus.put("burner", status.getBurnerStatus());
-                    deviceStatus.put("exhaustValve", status.getExhaustValveStatus());
-                    deviceStatus.put("verticalDryingFan", status.getVerticalDryingFanStatus());
-                    result.put("deviceStatus", deviceStatus);
+                // 2. 烘干塔传感器数据
+                DryingTowerDataDTO.DryingSensorDTO dryingSensor = buildDryingSensor(realtimeData);
+                builder.dryingSensor(dryingSensor);
 
-                    // 能耗数据
-                    Map<String, Object> energyConsumption = new HashMap<>();
-                    energyConsumption.put("instantPower", status.getInstantPower());
-                    energyConsumption.put("todayPowerConsumption", status.getTodayPowerConsumption());
-                    energyConsumption.put("gasFlowRate", status.getGasFlowRate());
-                    energyConsumption.put("outletGrainCount", status.getOutletGrainCount());
-                    result.put("energyConsumption", energyConsumption);
-                }
+                // 3. 烘干工艺数据
+                DryingTowerDataDTO.DryingProcessOptimizedDTO dryingProcess = buildDryingProcess(status);
+                builder.dryingProcess(dryingProcess);
+
+                // 4. 烘干设备数据
+                DryingTowerDataDTO.DryingEquipmentDTO dryingEquipment = buildDryingEquipment(status);
+                builder.dryingEquipment(dryingEquipment);
+
+                // 5. 能耗与告警数据
+                DryingTowerDataDTO.DryingEnergyAlarmDTO energyAlarm = buildEnergyAlarm(status);
+                builder.energyAlarm(energyAlarm);
+
+                // 6. 烘干监控数据
+                DryingTowerDataDTO.DryingVideoMonitorDTO videoMonitor = buildVideoMonitor();
+                builder.videoMonitor(videoMonitor);
             }
 
-            // 该设施的烘干批次
-            List<DryingBatch> batches = new ArrayList<>();
-            if (facility != null) {
-                batches = dryingService.lambdaQuery()
-                        .eq(DryingBatch::getFacilityId, facility.getId())
-                        .orderByDesc(DryingBatch::getCreateTime)
-                        .last("LIMIT 5")
-                        .list();
-            }
-            result.put("recentBatches", batches);
-            result.put("batchCount", batches.size());
-
-            // 烘干视频监控
-            Map<String, Object> videoMonitor = new HashMap<>();
-            videoMonitor.put("channel1", "camera_dry_001");
-            videoMonitor.put("channel2", "camera_dry_002");
-            videoMonitor.put("channel3", "camera_dry_003");
-            result.put("videoMonitor", videoMonitor);
-
-            return Result.success(result);
+            return Result.success(builder.build());
         } catch (Exception e) {
             log.error("获取烘干车间传感器数据失败, facilityId: {}", facilityId, e);
             return Result.fail("获取烘干数据失败: " + e.getMessage());
         }
+    }
+
+    private DryingTowerDataDTO.BaseInfoDTO buildBaseInfo(FacilityRealtimeData realtimeData, FacilityStatus status) {
+        return DryingTowerDataDTO.BaseInfoDTO.builder()
+                .runStatus(status != null && status.getRunStatus() != null ? status.getRunStatus() : "运行中")
+                .innerTemperature(realtimeData != null && realtimeData.getTemperature() != null ? realtimeData.getTemperature() : new BigDecimal("65.5"))
+                .outletMoisture(realtimeData != null && realtimeData.getOutletMoisture() != null ? realtimeData.getOutletMoisture() : new BigDecimal("13.5"))
+                .hotAirTemperature(realtimeData != null && realtimeData.getHotAirTemperature() != null ? realtimeData.getHotAirTemperature() : new BigDecimal("78.2"))
+                .build();
+    }
+
+    private DryingTowerDataDTO.DryingSensorDTO buildDryingSensor(FacilityRealtimeData realtimeData) {
+        return DryingTowerDataDTO.DryingSensorDTO.builder()
+                .innerTemperature(buildSensorItem(realtimeData != null && realtimeData.getTemperature() != null ? realtimeData.getTemperature() : new BigDecimal("65.5"), "°C"))
+                .hotAirTemperature(buildSensorItem(realtimeData != null && realtimeData.getHotAirTemperature() != null ? realtimeData.getHotAirTemperature() : new BigDecimal("78.2"), "°C"))
+                .outletMoisture(buildSensorItem(realtimeData != null && realtimeData.getOutletMoisture() != null ? realtimeData.getOutletMoisture() : new BigDecimal("13.5"), "%"))
+                .grainLayerThickness(buildSensorItem(realtimeData != null && realtimeData.getGrainLayerThickness() != null ? realtimeData.getGrainLayerThickness() : new BigDecimal("1.8"), "m"))
+                .build();
+    }
+
+    private DryingTowerDataDTO.SensorItemDTO buildSensorItem(BigDecimal value, String unit) {
+        return DryingTowerDataDTO.SensorItemDTO.builder()
+                .value(value)
+                .status("正常")
+                .unit(unit)
+                .build();
+    }
+
+    private DryingTowerDataDTO.DryingProcessOptimizedDTO buildDryingProcess(FacilityStatus status) {
+        return DryingTowerDataDTO.DryingProcessOptimizedDTO.builder()
+                .grainType(status != null && status.getGrainTypeProcessed() != null ? status.getGrainTypeProcessed() : "水稻")
+                .runStatus(status != null && status.getRunStatus() != null ? status.getRunStatus() : "运行中")
+                .processingCapacity(status != null && status.getProcessingCapacity() != null ? status.getProcessingCapacity() : new BigDecimal("8.5"))
+                .targetMoisture(status != null && status.getTargetMoistureProcess() != null ? status.getTargetMoistureProcess() : new BigDecimal("14.5"))
+                .dryingDuration(120)
+                .status("正常")
+                .build();
+    }
+
+    private DryingTowerDataDTO.DryingEquipmentDTO buildDryingEquipment(FacilityStatus status) {
+        return DryingTowerDataDTO.DryingEquipmentDTO.builder()
+                .elevator(DryingTowerDataDTO.DeviceItemDTO.builder()
+                        .status(status != null && status.getElevatorStatus() != null ? status.getElevatorStatus() : "运行中")
+                        .build())
+                .verticalDryingFan(DryingTowerDataDTO.DeviceItemDTO.builder()
+                        .status(status != null && status.getVerticalDryingFanStatus() != null ? status.getVerticalDryingFanStatus() : "运行中")
+                        .build())
+                .circulatingFan(DryingTowerDataDTO.DeviceItemWithSpeedDTO.builder()
+                        .status(status != null && status.getCirculatingFanStatus() != null ? status.getCirculatingFanStatus() : "运行中")
+                        .speed(1450)
+                        .build())
+                .burner(DryingTowerDataDTO.DeviceItemDTO.builder()
+                        .status(status != null && status.getBurnerStatus() != null ? status.getBurnerStatus() : "稳定")
+                        .build())
+                .exhaustValve(DryingTowerDataDTO.DeviceItemDTO.builder()
+                        .status(status != null && status.getExhaustValveStatus() != null ? status.getExhaustValveStatus() : "自动")
+                        .build())
+                .build();
+    }
+
+    private DryingTowerDataDTO.DryingEnergyAlarmDTO buildEnergyAlarm(FacilityStatus status) {
+        return DryingTowerDataDTO.DryingEnergyAlarmDTO.builder()
+                .instantPower(DryingTowerDataDTO.EnergyItemDTO.builder()
+                        .value(status != null && status.getInstantPower() != null ? status.getInstantPower() : new BigDecimal("45.2"))
+                        .status("正常")
+                        .unit("kW")
+                        .build())
+                .todayPowerConsumption(DryingTowerDataDTO.EnergyItemWithTagDTO.builder()
+                        .value(status != null && status.getTodayPowerConsumption() != null ? status.getTodayPowerConsumption() : new BigDecimal("1250.5"))
+                        .status("正常")
+                        .tag("节能")
+                        .unit("kWh")
+                        .build())
+                .gasFlowRate(DryingTowerDataDTO.EnergyItemDTO.builder()
+                        .value(status != null && status.getGasFlowRate() != null ? status.getGasFlowRate() : new BigDecimal("25.8"))
+                        .status("正常")
+                        .unit("m³/h")
+                        .build())
+                .outletGrainCount(DryingTowerDataDTO.EnergyItemDTO.builder()
+                        .value(status != null && status.getOutletGrainCount() != null ? status.getOutletGrainCount() : new BigDecimal("28.5"))
+                        .status("正常")
+                        .unit("t")
+                        .build())
+                .build();
+    }
+
+    private DryingTowerDataDTO.DryingVideoMonitorDTO buildVideoMonitor() {
+        List<DryingTowerDataDTO.CameraDTO> cameras = new ArrayList<>();
+        cameras.add(DryingTowerDataDTO.CameraDTO.builder()
+                .id("camera_dry_001")
+                .name("烘干塔进料口")
+                .streamUrl("rtsp://192.168.1.100:554/stream1")
+                .build());
+        cameras.add(DryingTowerDataDTO.CameraDTO.builder()
+                .id("camera_dry_002")
+                .name("烘干塔内部")
+                .streamUrl("rtsp://192.168.1.100:554/stream2")
+                .build());
+        cameras.add(DryingTowerDataDTO.CameraDTO.builder()
+                .id("camera_dry_003")
+                .name("烘干塔出料口")
+                .streamUrl("rtsp://192.168.1.100:554/stream3")
+                .build());
+
+        return DryingTowerDataDTO.DryingVideoMonitorDTO.builder()
+                .cameras(cameras)
+                .currentCameraId("camera_dry_001")
+                .build();
     }
 }

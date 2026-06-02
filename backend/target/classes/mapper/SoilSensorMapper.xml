@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.weiming.smartag.mapper.SoilSensorMapper">
-    
-    <select id="selectOnlineSensors" resultType="com.weiming.smartag.entity.SoilSensor">
-        SELECT * FROM soil_sensor WHERE status = 1
-    </select>
-    
-</mapper>

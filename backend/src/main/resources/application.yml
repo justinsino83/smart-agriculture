@@ -77,3 +77,8 @@ insect:
   sync:
     # 同步周期（分钟）
     interval: 30
+
+
+smartag:
+  config:
+    menu-model-path: /data/projects/2026/smartAgriculture/APP/config/menu-model-config.json

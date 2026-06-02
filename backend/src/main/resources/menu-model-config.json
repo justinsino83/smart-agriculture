@@ -1,0 +1,411 @@
+{
+  "menus": [
+    {
+      "id": "overview",
+      "name": "总览",
+      "icon": "🌍",
+      "position": {
+        "lon": "120.07",
+        "lat": "32.18"
+      },
+      "camera": {
+        "lon": 120.06647,
+        "lat": 32.18264,
+        "height": 9700.3,
+        "heading": 0,
+        "pitch": -50,
+        "roll": 0
+      }
+    },
+    {
+      "id": "nongtian1",
+      "name": "维明农场",
+      "icon": "🌱",
+      "children": [
+        {
+          "id": "Farm",
+          "name": "试验田",
+          "icon": "🌱",
+          "facilityId": 1,
+          "facilityType": 1,
+          "position": {
+            "lon": "120.097",
+            "lat": "32.250"
+          },
+          "gltfs": [
+            {
+              "id": "监控农田",
+              "url": "./static/glb/试验田_1.glb",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "scale": 1
+            }
+          ],
+          "threeCamera": {
+            "x": 0,
+            "y": 50,
+            "z": 18,
+            "tx": -11,
+            "ty": 1.8,
+            "tz": -50
+          },
+          "waterPump": {
+            "url": "./static/glb/水泵.glb",
+            "scale": 35,
+            "offset": {
+              "x": 0,
+              "y": 8,
+              "z": 0
+            }
+          },
+          "pestDevice": {
+            "url": "./static/glb/虫情测报仪.glb",
+            "scale": 35,
+            "offset": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "camera": {
+            "lon": 120.09738,
+            "lat": 32.24902,
+            "height": 422.6,
+            "heading": 0,
+            "pitch": -50,
+            "roll": 0
+          }
+        },
+        {
+          "id": "Workshop",
+          "name": "烘干车间",
+          "icon": "🏭",
+          "facilityId": 9,
+          "facilityType": 3,
+          "position": {
+            "lon": "120.089928",
+            "lat": "32.244513"
+          },
+          "gltfs": [
+            {
+              "id": "changfang1",
+              "url": "./static/glb/厂房1.glb",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "scale": 1
+            }
+          ],
+          "threeCamera": {
+            "x": 200,
+            "y": 200,
+            "z": -300,
+            "tx": 200,
+            "ty": 0,
+            "tz": 0
+          },
+          "dryingTowerDetail": {
+            "url": "./static/glb/烘干塔1.glb",
+            "scale": 1,
+            "offset": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "camera": {
+              "distance": 520
+            }
+          },
+          "camera": {
+            "lon": 120.08971,
+            "lat": 32.24951,
+            "height": 304,
+            "heading": 182,
+            "pitch": -46.9,
+            "roll": 0
+          }
+        },
+        {
+          "id": "Workshop2",
+          "name": "仓库",
+          "icon": "📦",
+          "facilityId": 7,
+          "facilityType": 2,
+          "position": {
+            "lon": "120.089928",
+            "lat": "32.244513"
+          },
+          "gltfs": [
+            {
+              "id": "仓库",
+              "url": "./static/glb/厂房1.glb",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "scale": 1
+            }
+          ],
+          "threeCamera": {
+            "x": -120,
+            "y": 112,
+            "z": -250,
+            "tx": -5,
+            "ty": 0,
+            "tz": 0
+          },
+          "camera": {
+            "lon": 120.08971,
+            "lat": 32.24951,
+            "height": 304,
+            "heading": 182,
+            "pitch": -46.9,
+            "roll": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "nongtian2",
+      "name": "红耕农场",
+      "icon": "🌱",
+      "children": [
+        {
+          "id": "Farm2",
+          "name": "试验田",
+          "facilityId": 2,
+          "facilityType": 1,
+          "icon": "🌱",
+          "position": {
+            "lon": "120.097",
+            "lat": "32.250"
+          },
+          "gltfs": [
+            {
+              "id": "试验田2",
+              "url": "./static/glb/试验田_2.glb",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "scale": 1
+            }
+          ],
+          "threeCamera": {
+            "x": 5,
+            "y": 150,
+            "z": -155
+          },
+          "waterPump": {
+            "url": "./static/glb/水泵.glb",
+            "scale": 35,
+            "offset": {
+              "x": 0,
+              "y": 8,
+              "z": 0
+            }
+          },
+          "pestDevice": {
+            "url": "./static/glb/虫情测报仪.glb",
+            "scale": 35,
+            "offset": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "camera": {
+            "lon": 120.04952,
+            "lat": 32.26108,
+            "height": 793,
+            "heading": 0,
+            "pitch": -51,
+            "roll": 0
+          }
+        },
+        {
+          "id": "Workshop3",
+          "facilityId": 10,
+          "name": "烘干车间",
+          "icon": "🏭",
+          "facilityType": 3,
+          "position": {
+            "lon": "120.089928",
+            "lat": "32.244513"
+          },
+          "gltfs": [
+            {
+              "id": "changfang3",
+              "url": "./static/glb/厂房3-有底图.glb",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "scale": 1
+            }
+          ],
+          "threeCamera": {
+            "x": 10,
+            "y": 550,
+            "z": 1020
+          },
+          "dryingTowerDetail": {
+            "url": "./static/glb/烘干塔1.glb",
+            "scale": 1,
+            "offset": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "camera": {
+              "distance": 520
+            }
+          },
+          "camera": {
+            "lon": 120.01789,
+            "lat": 32.25442,
+            "height": 101.6,
+            "heading": 346.1,
+            "pitch": -23,
+            "roll": 0
+          }
+        },
+        {
+          "id": "Warehouse2",
+          "name": "仓库",
+          "icon": "📦",
+          "facilityId": 6,
+          "facilityType": 2,
+          "position": {
+            "lon": "120.089928",
+            "lat": "32.244513"
+          },
+          "gltfs": [
+            {
+              "id": "仓库2",
+              "url": "./static/glb/厂房2.glb",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "scale": 1
+            }
+          ],
+          "threeCamera": {
+            "x": 61,
+            "y": 140,
+            "z": -52,
+            "tx": 60,
+            "ty": 21,
+            "tz": -340
+          },
+          "camera": {
+            "lon": 120.0299,
+            "lat": 32.25767,
+            "height": 123.8,
+            "heading": 182.7,
+            "pitch": -28.7,
+            "roll": 0
+          }
+        }
+      ]
+    }
+  ],
+  "gltfs": [
+    {
+      "url": "./static/glb/厂房1.glb",
+      "label": "维明农场",
+      "id": "Workshop",
+      "lon": 120.08935,
+      "lat": 32.24715,
+      "height": 10,
+      "scale": 0.285,
+      "heading": 88,
+      "pitch": 0,
+      "roll": 0,
+      "lines": [
+        120.088662, 32.247261,
+        120.088779, 32.246539,
+        120.090681, 32.246755,
+        120.090565, 32.247514,
+        120.088662, 32.247261
+      ]
+    },
+    {
+      "url": "./static/glb/试验田_1.glb",
+      "label": "维明农场试验田",
+      "id": "Farm",
+      "lon": 120.0973,
+      "lat": 32.2517,
+      "height": 0,
+      "scale": 1.8,
+      "heading": 89,
+      "pitch": 0,
+      "roll": 0,
+      "point": [120.097195, 32.252956],
+      "lines": [
+        120.096171, 32.253432,
+        120.097299, 32.253475,
+        120.097368, 32.253085,
+        120.098644, 32.253255,
+        120.098756, 32.252505,
+        120.096226, 32.252444,
+        120.096171, 32.253432
+      ]
+    },
+    {
+      "url": "./static/glb/厂房3-无底图.glb",
+      "name": "政府农场",
+      "id": "Workshop3",
+      "lon": 120.0172,
+      "lat": 32.2565,
+      "height": 0,
+      "scale": 0.088,
+      "heading": 87,
+      "pitch": 0,
+      "roll": 0,
+      "lines": [
+        120.017523, 32.256777,
+        120.016665, 32.256261,
+        120.017207, 32.255734,
+        120.017947, 32.256303,
+        120.017523, 32.256777
+      ]
+    },
+    {
+      "url": "./static/glb/仓库2.glb",
+      "label": "仓库",
+      "id": "Warehouse2",
+      "lon": 120.0298,
+      "lat": 32.2558,
+      "height": 0,
+      "scale": 0.6,
+      "heading": 255,
+      "pitch": 0,
+      "roll": 0,
+      "lines": [
+        120.029499, 32.255953,
+        120.029525, 32.25561,
+        120.03005, 32.255715,
+        120.030005, 32.256058,
+        120.029499, 32.255953
+      ]
+    },
+    {
+      "url": "./static/glb/试验田_2.glb",
+      "label": "政府试验田",
+      "id": "Warehouse3",
+      "lon": 120.0289,
+      "lat": 32.2574,
+      "height": 0,
+      "scale": 1.72,
+      "heading": 89,
+      "pitch": 0,
+      "roll": 0,
+      "lines": [
+        120.027347, 32.258261,
+        120.029314, 32.259169,
+        120.029424, 32.257773,
+        120.027429, 32.256879,
+        120.027347, 32.258261
+      ]
+    }
+  ]
+}
