@@ -44,5 +44,25 @@ public interface StorageService extends IService<StorageRecord> {
     /**
      * 分页获取库存列表
      */
-    Map<String, Object> getStockListPage(int page, int size);
+    Map<String, Object> getStockListPage(int page, int size, String keyword);
+    
+    /**
+     * 获取预警列表
+     */
+    List<Map<String, Object>> getAlerts();
+    
+    /**
+     * 获取库存追溯信息
+     */
+    Map<String, Object> getTrace(Long stockId);
+    
+    /**
+     * 获取库存详情
+     */
+    StorageRecord getStockDetail(Long stockId);
+    
+    /**
+     * 删除库存记录
+     */
+    boolean deleteStock(Long id);
 }

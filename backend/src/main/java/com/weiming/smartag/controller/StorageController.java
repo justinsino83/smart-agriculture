@@ -50,12 +50,13 @@ public class StorageController {
     }
 
     @GetMapping("/stock")
-    @Operation(summary = "获取库存列表", description = "分页获取在库库存列表")
+    @Operation(summary = "获取库存列表", description = "分页获取库存列表")
     public Result<java.util.Map<String, Object>> getStockList(
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size) {
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "搜索关键词（品种/批次号）") @RequestParam(required = false) String keyword) {
         try {
-            return Result.success(storageService.getStockListPage(page, size));
+            return Result.success(storageService.getStockListPage(page, size, keyword));
         } catch (Exception e) {
             log.error("获取在库列表失败", e);
             return Result.fail("获取在库列表失败: " + e.getMessage());
@@ -384,5 +385,81 @@ public class StorageController {
                 .status(status)
                 .unit(unit)
                 .build();
+    }
+
+    @PostMapping("/stock-in")
+    @Operation(summary = "入库登记", description = "新增库存入库记录")
+    public Result<?> stockIn(@RequestBody com.weiming.smartag.entity.StorageRecord record) {
+        try {
+            if (record == null) {
+                return Result.fail("入库数据不能为空");
+            }
+            boolean success = storageService.storageIn(record);
+            return success ? Result.success("入库成功") : Result.error("入库失败");
+        } catch (Exception e) {
+            log.error("入库失败, record: {}", record, e);
+            return Result.fail("入库失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/stock-out")
+    @Operation(summary = "出库登记", description = "执行库存出库操作")
+    public Result<?> stockOut(@RequestBody java.util.Map<String, String> params) {
+        try {
+            String batchNo = params.get("batchNo");
+            if (!org.springframework.util.StringUtils.hasText(batchNo)) {
+                return Result.fail("批次号不能为空");
+            }
+            boolean success = storageService.storageOut(batchNo);
+            return success ? Result.success("出库成功") : Result.error("出库失败，批次号不存在");
+        } catch (Exception e) {
+            log.error("出库失败, params: {}", params, e);
+            return Result.fail("出库失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/alerts")
+    @Operation(summary = "获取库存预警", description = "获取所有库存预警信息")
+    public Result<List<java.util.Map<String, Object>>> getAlerts() {
+        try {
+            return Result.success(storageService.getAlerts());
+        } catch (Exception e) {
+            log.error("获取库存预警失败", e);
+            return Result.fail("获取库存预警失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/stock/{stockId}")
+    @Operation(summary = "获取库存详情", description = "根据ID获取库存详情")
+    public Result<com.weiming.smartag.entity.StorageRecord> getStockDetail(@PathVariable Long stockId) {
+        try {
+            return Result.success(storageService.getStockDetail(stockId));
+        } catch (Exception e) {
+            log.error("获取库存详情失败, stockId: {}", stockId, e);
+            return Result.fail("获取库存详情失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/stock/{stockId}/trace")
+    @Operation(summary = "获取库存追溯信息", description = "根据库存ID获取追溯信息")
+    public Result<java.util.Map<String, Object>> getTrace(@PathVariable Long stockId) {
+        try {
+            return Result.success(storageService.getTrace(stockId));
+        } catch (Exception e) {
+            log.error("获取库存追溯信息失败, stockId: {}", stockId, e);
+            return Result.fail("获取库存追溯信息失败: " + e.getMessage());
+        }
+    }
+    
+    @DeleteMapping("/stock/{stockId}")
+    @Operation(summary = "删除库存记录", description = "根据ID删除库存记录")
+    public Result<?> deleteStock(@PathVariable Long stockId) {
+        try {
+            boolean success = storageService.deleteStock(stockId);
+            return success ? Result.success("删除成功") : Result.error("删除失败");
+        } catch (Exception e) {
+            log.error("删除库存记录失败, stockId: {}", stockId, e);
+            return Result.fail("删除失败: " + e.getMessage());
+        }
     }
 }

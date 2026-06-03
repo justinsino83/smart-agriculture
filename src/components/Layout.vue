@@ -63,9 +63,9 @@
         <breadcrumb-nav />
 
         <div class="header-right">
-          <el-badge :value="3" class="badge">
+          <!-- <el-badge :value="3" class="badge">
             <el-icon><Warning /></el-icon>
-          </el-badge>
+          </el-badge> -->
 
           <el-dropdown @command="handleCommand">
             <span class="user-dropdown">
@@ -76,8 +76,8 @@
 
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-                <el-dropdown-item command="settings">系统设置</el-dropdown-item>
+                <!-- <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+                <el-dropdown-item command="settings">系统设置</el-dropdown-item> -->
                 <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>

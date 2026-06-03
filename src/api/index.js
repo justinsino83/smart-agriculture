@@ -165,6 +165,7 @@ export const storageApi = {
   getStockDetail: (stockId) => api.get(`/api/storage/stock/${stockId}`),
   stockIn: (data) => api.post('/api/storage/stock-in', data),
   stockOut: (data) => api.post('/api/storage/stock-out', data),
+  deleteStock: (stockId) => api.delete(`/api/storage/stock/${stockId}`),
   getAlerts: () => api.get('/api/storage/alerts'),
   getTrace: (stockId) => api.get(`/api/storage/stock/${stockId}/trace`)
 }

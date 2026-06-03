@@ -182,17 +182,25 @@ public class StorageServiceImpl extends ServiceImpl<StorageRecordMapper, Storage
     }
     
     @Override
-    public Map<String, Object> getStockListPage(int page, int size) {
+    public Map<String, Object> getStockListPage(int page, int size, String keyword) {
         Map<String, Object> result = new HashMap<>();
         
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<StorageRecord> pageObj = 
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
         
+        var queryWrapper = lambdaQuery();
+        
+        // 如果有关键词，添加搜索条件
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            queryWrapper.and(wrapper -> wrapper
+                    .like(StorageRecord::getGrainType, keyword)
+                    .or()
+                    .like(StorageRecord::getBatchNo, keyword)
+            );
+        }
+        
         com.baomidou.mybatisplus.core.metadata.IPage<StorageRecord> pageResult = 
-                lambdaQuery()
-                        .eq(StorageRecord::getStatus, 0)
-                        .orderByDesc(StorageRecord::getEntryDate)
-                        .page(pageObj);
+                queryWrapper.orderByDesc(StorageRecord::getEntryDate).page(pageObj);
         
         result.put("list", pageResult.getRecords());
         result.put("total", pageResult.getTotal());
@@ -200,5 +208,91 @@ public class StorageServiceImpl extends ServiceImpl<StorageRecordMapper, Storage
         result.put("size", pageResult.getSize());
         
         return result;
+    }
+    
+    @Override
+    public List<Map<String, Object>> getAlerts() {
+        List<Map<String, Object>> alerts = new ArrayList<>();
+        LocalDateTime warningDate = LocalDateTime.now().minusDays(90);
+        
+        List<StorageRecord> warningRecords = lambdaQuery()
+                .eq(StorageRecord::getStatus, 0)
+                .list()
+                .stream()
+                .filter(r -> (r.getEntryDate() != null && r.getEntryDate().isBefore(warningDate)) || 
+                        (r.getQuantity() != null && r.getQuantity() < 10))
+                .collect(Collectors.toList());
+        
+        for (StorageRecord record : warningRecords) {
+            Map<String, Object> alert = new HashMap<>();
+            alert.put("id", record.getId());
+            alert.put("batchNo", record.getBatchNo());
+            alert.put("grainType", record.getGrainType());
+            alert.put("warehouse", record.getWarehouse());
+            alert.put("quantity", record.getQuantity());
+            
+            List<String> reasons = new ArrayList<>();
+            List<String> suggestions = new ArrayList<>();
+            
+            if (record.getEntryDate() != null && record.getEntryDate().isBefore(warningDate)) {
+                reasons.add("库存时间超过90天");
+                suggestions.add("建议尽快出库或轮换");
+            }
+            
+            if (record.getQuantity() != null && record.getQuantity() < 10) {
+                reasons.add("库存数量不足10吨");
+                suggestions.add("建议及时补充库存");
+            }
+            
+            alert.put("reasons", reasons);
+            alert.put("suggestions", suggestions);
+            alert.put("entryDate", record.getEntryDate());
+            
+            alerts.add(alert);
+        }
+        
+        return alerts;
+    }
+    
+    @Override
+    public Map<String, Object> getTrace(Long stockId) {
+        Map<String, Object> trace = new HashMap<>();
+        StorageRecord record = getById(stockId);
+        
+        if (record != null) {
+            trace.put("basicInfo", record);
+            
+            List<Map<String, Object>> timeline = new ArrayList<>();
+            
+            Map<String, Object> entryEvent = new HashMap<>();
+            entryEvent.put("time", record.getEntryDate());
+            entryEvent.put("type", "入库");
+            entryEvent.put("description", String.format("%s入库%s%.2f吨", 
+                    record.getWarehouse(), record.getGrainType(), record.getQuantity()));
+            timeline.add(entryEvent);
+            
+            if (record.getStatus() == 1 && record.getExitDate() != null) {
+                Map<String, Object> exitEvent = new HashMap<>();
+                exitEvent.put("time", record.getExitDate());
+                exitEvent.put("type", "出库");
+                exitEvent.put("description", String.format("%s出库%s%.2f吨", 
+                        record.getWarehouse(), record.getGrainType(), record.getQuantity()));
+                timeline.add(exitEvent);
+            }
+            
+            trace.put("timeline", timeline);
+        }
+        
+        return trace;
+    }
+    
+    @Override
+    public StorageRecord getStockDetail(Long stockId) {
+        return getById(stockId);
+    }
+    
+    @Override
+    public boolean deleteStock(Long id) {
+        return removeById(id);
     }
 }
