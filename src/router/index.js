@@ -87,6 +87,12 @@ const routes = [
             name: 'Users',
             component: () => import('@/views/system/UserManagement.vue'),
             meta: { title: '用户管理', icon: 'User' }
+          },
+          {
+            path: '/system/llm',
+            name: 'LlmModel',
+            component: () => import('@/views/llm/index.vue'),
+            meta: { title: '模型管理', icon: 'Cpu' }
           }
         ]
       }

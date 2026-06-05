@@ -40,6 +40,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
             "/api/storage/**",
             "/api/testfield/**",
             "/api/overview",
+            "/api/llm/**",
             "/error"
     };
 

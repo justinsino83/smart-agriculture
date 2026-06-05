@@ -103,7 +103,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Monitor, Odometer, TrendCharts, Coffee, Sunny, Warning,
-  Sunrise, Box, Lightning, Tools, User, ArrowDown
+  Sunrise, Box, Lightning, Tools, User, ArrowDown, Cpu
 } from '@element-plus/icons-vue'
 import BreadcrumbNav from './BreadcrumbNav.vue'
 import router from '@/router'
@@ -122,7 +122,8 @@ const iconMap = {
   Lightning,
   Tools,
   User,
-  ArrowDown
+  ArrowDown,
+  Cpu
 }
 
 const route = useRoute()

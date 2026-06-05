@@ -65,3 +65,16 @@ export const userApi = {
   logout: () => api.post('/api/auth/logout'),
   getInfo: () => api.get('/api/auth/info')
 }
+
+export const llmApi = {
+  // 前端下拉框使用的接口
+  getModels: () => api.get('/api/llm/models'),
+
+  // 管理页面接口
+  listModels: (params) => api.get('/api/llm/admin/models', { params }),
+  getModelDetail: (id) => api.get(`/api/llm/admin/models/${id}`),
+  addModel: (data) => api.post('/api/llm/admin/models', data),
+  updateModel: (id, data) => api.put(`/api/llm/admin/models/${id}`, data),
+  deleteModel: (id) => api.delete(`/api/llm/admin/models/${id}`),
+  toggleAvailable: (id) => api.put(`/api/llm/admin/models/${id}/available`)
+}
