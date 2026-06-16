@@ -55,6 +55,7 @@ public class TestFieldController {
 
     private final FacilityService facilityService;
     private final DevicePushDataMapper devicePushDataMapper;
+    private final InsectDataMapper insectDataMapper;
     private final MenuModelConfigService menuModelConfigService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -88,6 +89,9 @@ public class TestFieldController {
             ExternalIotAggregate iot = fetchExternalIotData(facilityId);
             builder.valve(buildValveData(iot));
             builder.waterMeter(buildWaterMeterData(iot));
+
+            // 7) 虫情数据
+            builder.insectData(buildInsectData(facilityId));
 
             return Result.success(builder.build());
         } catch (Exception e) {
@@ -242,6 +246,109 @@ public class TestFieldController {
                 .status(iot.getWaterStatus())
                 .count(iot.getWaterMeterDevices().size())
                 .build();
+    }
+
+    // ========================================================================
+    // 虫情数据：解析 insect_data.detect_result 中 JSON 数组做虫名聚合
+    // ========================================================================
+    private TestFieldDataDTO.InsectData buildInsectData(Long facilityId) {
+        String imei = resolveInsectImei(facilityId);
+        List<TestFieldDataDTO.InsectStatItem> statistics = new ArrayList<>();
+        Object latestRecord = null;
+
+        try {
+            List<com.weiming.smartag.entity.InsectData> list;
+            if (imei != null && !imei.trim().isEmpty()) {
+                list = insectDataMapper.selectList(
+                        new LambdaQueryWrapper<com.weiming.smartag.entity.InsectData>()
+                                .eq(com.weiming.smartag.entity.InsectData::getImei, imei)
+                                .orderByDesc(com.weiming.smartag.entity.InsectData::getRecordTime)
+                                .last("LIMIT 100"));
+            } else {
+                list = insectDataMapper.selectList(
+                        new LambdaQueryWrapper<com.weiming.smartag.entity.InsectData>()
+                                .orderByDesc(com.weiming.smartag.entity.InsectData::getRecordTime)
+                                .last("LIMIT 100"));
+            }
+
+            if (list != null && !list.isEmpty()) {
+                latestRecord = list.get(0);
+                Map<String, Integer> typeCountMap = new HashMap<>();
+                for (com.weiming.smartag.entity.InsectData item : list) {
+                    String detectResult = item.getDetectResult();
+                    if (detectResult == null || detectResult.trim().isEmpty()) continue;
+
+                    int startIndex = detectResult.indexOf('[');
+                    int endIndex = detectResult.lastIndexOf(']');
+                    if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) continue;
+
+                    try {
+                        String cleanJson = detectResult.substring(startIndex, endIndex + 1)
+                                .replace("\\n", "")
+                                .replace("\\r", "")
+                                .replace("\\t", "")
+                                .replace("\n", "")
+                                .replace("\r", "")
+                                .replace("\\", "");
+
+                        List<Map<String, Object>> detectList = objectMapper.readValue(
+                                cleanJson, new TypeReference<List<Map<String, Object>>>() {});
+
+                        for (Map<String, Object> detectItem : detectList) {
+                            String insectName = (String) detectItem.get("name");
+                            if (insectName == null || insectName.isEmpty()) insectName = "未知虫害";
+                            typeCountMap.merge(insectName, 1, Integer::sum);
+                        }
+                    } catch (Exception e) {
+                        log.warn("解析虫情检测结果失败, id={}, raw={}", item.getId(), detectResult, e);
+                    }
+                }
+
+                for (Map.Entry<String, Integer> entry : typeCountMap.entrySet()) {
+                    statistics.add(TestFieldDataDTO.InsectStatItem.builder()
+                            .name(entry.getKey())
+                            .count(entry.getValue())
+                            .build());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("查询虫情数据失败, facilityId={}", facilityId, e);
+        }
+
+        return TestFieldDataDTO.InsectData.builder()
+                .latestRecord(latestRecord)
+                .statistics(statistics)
+                .build();
+    }
+
+    /**
+     * 尝试从菜单配置中找到当前 facilityId 对应节点的虫情设备号(insectDeviceId)；
+     * 未找到时返回 null，此时会退化为按记录时间倒序的最近 100 条。
+     */
+    @SuppressWarnings("unchecked")
+    private String resolveInsectImei(Long facilityId) {
+        if (facilityId == null) return null;
+        try {
+            Map<String, Object> config = menuModelConfigService.getConfig();
+            List<Map<String, Object>> menus = (List<Map<String, Object>>) config.get("menus");
+            if (menus == null) return null;
+            for (Map<String, Object> topMenu : menus) {
+                Object children = topMenu.get("children");
+                if (!(children instanceof List)) continue;
+                for (Object childRaw : (List<?>) children) {
+                    if (!(childRaw instanceof Map)) continue;
+                    Map<String, Object> child = (Map<String, Object>) childRaw;
+                    Object fid = child.get("facilityId");
+                    if (fid != null && String.valueOf(fid).equals(String.valueOf(facilityId))) {
+                        Object imei = child.get("insectDeviceId");
+                        return imei != null ? String.valueOf(imei) : null;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("解析菜单配置获取虫情设备号失败, facilityId={}", facilityId, e);
+        }
+        return null;
     }
 
     // ========================================================================

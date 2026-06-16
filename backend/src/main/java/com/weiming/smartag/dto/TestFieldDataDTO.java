@@ -31,6 +31,9 @@ public class TestFieldDataDTO {
     @Schema(description = "水位计数据（来自外部IoT平台）")
     private WaterMeterData waterMeter;
 
+    @Schema(description = "虫情数据")
+    private InsectData insectData;
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -116,6 +119,30 @@ public class TestFieldDataDTO {
         @Schema(description = "整体有水状态")
         private String status;
         @Schema(description = "农场下的水位计数量")
+        private Integer count;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "虫情数据（来自本地虫情表 JSON 解析）")
+    public static class InsectData {
+        @Schema(description = "最新一条虫情记录")
+        private Object latestRecord;
+        @Schema(description = "虫情统计（按虫名聚合的出现次数）")
+        private List<InsectStatItem> statistics;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "虫情统计项")
+    public static class InsectStatItem {
+        @Schema(description = "虫类名称")
+        private String name;
+        @Schema(description = "出现次数")
         private Integer count;
     }
 }
