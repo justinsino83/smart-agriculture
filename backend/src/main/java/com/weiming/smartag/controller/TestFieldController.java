@@ -7,6 +7,7 @@ import com.weiming.smartag.common.Result;
 import com.weiming.smartag.dto.TestFieldDataDTO;
 import com.weiming.smartag.entity.DevicePushData;
 import com.weiming.smartag.mapper.DevicePushDataMapper;
+import com.weiming.smartag.mapper.InsectDataMapper;
 import com.weiming.smartag.service.FacilityService;
 import com.weiming.smartag.service.MenuModelConfigService;
 import io.swagger.v3.oas.annotations.Operation;
