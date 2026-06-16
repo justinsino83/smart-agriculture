@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -15,8 +16,8 @@ import java.math.BigDecimal;
 @Schema(description = "试验田数据（总览基础 + IoT 设备数据）")
 public class TestFieldDataDTO {
 
-    @Schema(description = "环境监测数据")
-    private EnvData environment;
+    @Schema(description = "环境监测数据（近5天）")
+    private List<EnvData> environment;
 
     @Schema(description = "土壤监测数据")
     private SoilData soil;
