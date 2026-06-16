@@ -31,6 +31,9 @@ public class TestFieldDataDTO {
     @Schema(description = "灌溉数据")
     private IrrigationData irrigationData;
 
+    @Schema(description = "水位计数据")
+    private WaterLevelData waterLevelData;
+
     @Schema(description = "虫情数据")
     private InsectData insectData;
 
@@ -129,6 +132,32 @@ public class TestFieldDataDTO {
         private Integer alertCount;
         @Schema(description = "预警状态")
         private String alertStatus;
+        @Schema(description = "阀门开度(来自排水阀实时值)")
+        private BigDecimal valvePosition;
+        @Schema(description = "阀门电流(来自排水阀实时值)")
+        private BigDecimal valveCurrent;
+        @Schema(description = "阀门电压(来自排水阀实时值)")
+        private BigDecimal valveVoltage;
+        @Schema(description = "保护扭矩(来自排水阀实时值)")
+        private BigDecimal protectTorque;
+        @Schema(description = "当前农场下的排水阀设备数量")
+        private Integer valveCount;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "水位计数据(来自外部IoT平台)")
+    public static class WaterLevelData {
+        @Schema(description = "平均水位")
+        private BigDecimal waterLevel;
+        @Schema(description = "有水的水位计数量")
+        private Integer hasWater;
+        @Schema(description = "整体有水状态(正常/部分有水/无水)")
+        private String waterStatus;
+        @Schema(description = "当前农场下的水位计设备数量")
+        private Integer waterMeterCount;
     }
 
     @Data

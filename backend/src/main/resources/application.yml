@@ -82,3 +82,11 @@ insect:
 smartag:
   config:
     menu-model-path: /data/projects/2026/smartAgriculture/APP/config/menu-model-config.json
+
+# 外部 IoT 设备平台（水位计/排水阀）
+iot:
+  platform:
+    base-url: https://hualin.xyune.com:8443/api/iot/manage/api
+    token: BCACAFFC658149958B6401A3F0179281
+    connect-timeout: 15000
+    read-timeout: 15000

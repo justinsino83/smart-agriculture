@@ -1,6 +1,8 @@
 package com.weiming.smartag.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.weiming.smartag.common.Result;
 import com.weiming.smartag.entity.DevicePushData;
 import com.weiming.smartag.entity.InsectData;
@@ -29,6 +31,7 @@ public class OverviewController {
     private final MenuModelConfigService menuModelConfigService;
     private final DevicePushDataMapper devicePushDataMapper;
     private final InsectDataMapper insectDataMapper;
+    private final ObjectMapper objectMapper;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM-dd");
 
@@ -250,7 +253,7 @@ public class OverviewController {
     }
 
     /**
-     * 虫情数据（保留原逻辑，虫情数据独立于 device_push_data）
+     * 虫情数据：保留原有的 JSON 清洗+按虫害类型统计逻辑
      */
     private Map<String, Object> buildInsectData() {
         Map<String, Object> result = new HashMap<>();
@@ -261,26 +264,58 @@ public class OverviewController {
                         .last("LIMIT 100")
         );
 
-        if (insectList != null && !insectList.isEmpty()) {
-            result.put("latestRecord", insectList.get(0));
-            Map<String, Integer> typeCountMap = new HashMap<>();
-            for (InsectData item : insectList) {
-                String detectResult = item.getDetectResult();
-                if (detectResult == null || detectResult.trim().isEmpty()) {
-                    continue;
-                }
-                // 仅做简单按原始记录统计，避免与前端展示强耦合
-                typeCountMap.merge("检测记录", 1, Integer::sum);
-            }
-            List<Map<String, Object>> statistics = new ArrayList<>();
-            for (Map.Entry<String, Integer> entry : typeCountMap.entrySet()) {
-                Map<String, Object> stat = new HashMap<>();
-                stat.put("name", entry.getKey());
-                stat.put("count", entry.getValue());
-                statistics.add(stat);
-            }
-            result.put("statistics", statistics);
+        if (insectList == null || insectList.isEmpty()) {
+            return result;
         }
+
+        result.put("latestRecord", insectList.get(0));
+
+        Map<String, Integer> typeCountMap = new HashMap<>();
+        for (InsectData item : insectList) {
+            String detectResult = item.getDetectResult();
+            if (detectResult == null || detectResult.trim().isEmpty()) {
+                continue;
+            }
+
+            int startIndex = detectResult.indexOf('[');
+            int endIndex = detectResult.lastIndexOf(']');
+            if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
+                continue;
+            }
+
+            try {
+                String cleanJson = detectResult.substring(startIndex, endIndex + 1)
+                        .replace("\\n", "")
+                        .replace("\\r", "")
+                        .replace("\\t", "")
+                        .replace("\n", "")
+                        .replace("\r", "")
+                        .replace("\\", "");
+
+                List<Map<String, Object>> detectList = objectMapper.readValue(
+                        cleanJson, new TypeReference<List<Map<String, Object>>>() {});
+
+                for (Map<String, Object> detectItem : detectList) {
+                    String insectName = (String) detectItem.get("name");
+                    if (insectName == null || insectName.isEmpty()) {
+                        insectName = "未知虫害";
+                    }
+                    typeCountMap.merge(insectName, 1, Integer::sum);
+                }
+            } catch (Exception e) {
+                log.warn("解析虫情检测结果失败, id={}, raw={}", item.getId(), detectResult, e);
+            }
+        }
+
+        List<Map<String, Object>> statistics = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : typeCountMap.entrySet()) {
+            Map<String, Object> stat = new HashMap<>();
+            stat.put("name", entry.getKey());
+            stat.put("count", entry.getValue());
+            statistics.add(stat);
+        }
+        statistics.sort((a, b) -> (Integer) b.get("count") - (Integer) a.get("count"));
+        result.put("statistics", statistics);
 
         return result;
     }
