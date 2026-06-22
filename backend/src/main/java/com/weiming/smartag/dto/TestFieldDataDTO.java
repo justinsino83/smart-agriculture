@@ -25,14 +25,17 @@ public class TestFieldDataDTO {
     @Schema(description = "气象监测数据")
     private WeatherData weather;
 
-    @Schema(description = "排水阀数据（来自外部IoT平台）")
-    private ValveData valve;
+    @Schema(description = "排水阀数据（来自外部IoT平台 deviceValues 接口，按设备返回实时值）")
+    private List<ValveItem> valves;
 
-    @Schema(description = "水位计数据（来自外部IoT平台）")
-    private WaterMeterData waterMeter;
+    @Schema(description = "水位计数据（来自外部IoT平台 deviceValues 接口）")
+    private WaterMeterItem waterMeter;
 
     @Schema(description = "虫情数据")
     private InsectData insectData;
+
+    @Schema(description = "摄像头列表（来自外部IoT平台）")
+    private List<CameraItem> cameras;
 
     @Data
     @Builder
@@ -86,40 +89,48 @@ public class TestFieldDataDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Schema(description = "排水阀数据（来自IoT平台实时值）")
-    public static class ValveData {
-        @Schema(description = "阀门状态文本（在线/离线/已开启数等）")
-        private String status;
-        @Schema(description = "平均压力1")
+    @Schema(description = "排水阀数据（来自IoT平台 deviceValues 实时值）")
+    public static class ValveItem {
+        @Schema(description = "设备id")
+        private String deviceId;
+        @Schema(description = "设备名称")
+        private String name;
+        @Schema(description = "站点名称")
+        private String stationName;
+        @Schema(description = "压力1")
         private BigDecimal pressure1;
-        @Schema(description = "平均压力2")
+        @Schema(description = "压力2")
         private BigDecimal pressure2;
         @Schema(description = "阀门开度")
         private BigDecimal pos;
-        @Schema(description = "阀门电流")
+        @Schema(description = "电流")
         private BigDecimal current;
-        @Schema(description = "阀门电压")
+        @Schema(description = "电压")
         private BigDecimal voltage;
         @Schema(description = "保护扭矩")
         private BigDecimal protectTorque;
-        @Schema(description = "农场下的排水阀数量")
-        private Integer count;
+        @Schema(description = "状态（原始字符串）")
+        private String status;
     }
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Schema(description = "水位计数据（来自IoT平台实时值）")
-    public static class WaterMeterData {
-        @Schema(description = "平均水位")
+    @Schema(description = "水位计数据（来自IoT平台 deviceValues 实时值）")
+    public static class WaterMeterItem {
+        @Schema(description = "设备id")
+        private String deviceId;
+        @Schema(description = "设备名称")
+        private String name;
+        @Schema(description = "站点名称")
+        private String stationName;
+        @Schema(description = "水位")
         private BigDecimal waterLevel;
-        @Schema(description = "有水的水位计数量")
-        private Integer hasWater;
-        @Schema(description = "整体有水状态")
+        @Schema(description = "是否有水（原始字段）")
+        private Object hasWater;
+        @Schema(description = "状态（原始字符串）")
         private String status;
-        @Schema(description = "农场下的水位计数量")
-        private Integer count;
     }
 
     @Data
@@ -144,5 +155,29 @@ public class TestFieldDataDTO {
         private String name;
         @Schema(description = "出现次数")
         private Integer count;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "摄像头信息（来自外部 IoT 平台 listAllDevices）")
+    public static class CameraItem {
+        @Schema(description = "摄像头 deviceId")
+        private String deviceId;
+        @Schema(description = "摄像头名称")
+        private String name;
+        @Schema(description = "是否启用 0/1")
+        private Object enable;
+        @Schema(description = "在线状态 0/1")
+        private Object status;
+        @Schema(description = "国标编号")
+        private String gbId;
+        @Schema(description = "HLS/FLV 播放地址")
+        private String httpsFlvUrl;
+        @Schema(description = "所属站点名称")
+        private String stationName;
+        @Schema(description = "设备类型名称")
+        private String deviceTypeName;
     }
 }

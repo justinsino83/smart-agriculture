@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.weiming.smartag.common.Result;
+import com.weiming.smartag.config.IotProperties;
 import com.weiming.smartag.dto.TestFieldDataDTO;
 import com.weiming.smartag.entity.DevicePushData;
 import com.weiming.smartag.mapper.DevicePushDataMapper;
@@ -15,7 +16,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -45,15 +45,10 @@ public class TestFieldController {
     private static final int DEVICE_TYPE_VALVE = 120;
     /** 水位计 device_type */
     private static final int DEVICE_TYPE_WATER_LEVEL = 121;
-    /** 视频摄像头 device_type（需排除） */
+    /** 视频摄像头 device_type */
     private static final int DEVICE_TYPE_CAMERA = 1;
 
-    @Value("${iot.platform.base-url:}")
-    private String iotBaseUrl;
-
-    @Value("${iot.platform.token:}")
-    private String iotToken;
-
+    private final IotProperties iotProperties;
     private final FacilityService facilityService;
     private final DevicePushDataMapper devicePushDataMapper;
     private final InsectDataMapper insectDataMapper;
@@ -62,36 +57,45 @@ public class TestFieldController {
     private final ObjectMapper objectMapper;
 
     @GetMapping("/sensors")
-    @Operation(summary = "获取试验田传感器数据", description = "基于总览数据结构，外加外部 IoT 平台的排水阀 / 水位计实时数据")
+    @Operation(summary = "获取试验田传感器数据", description = "基于总览数据结构，外加外部 IoT 平台的排水阀 / 水位计 / 摄像头实时数据")
     public Result<TestFieldDataDTO> getTestFieldSensors(
             @Parameter(description = "设施ID")
             @RequestParam(required = false) Long facilityId) {
         try {
-            // 1) 设施不存在时直接按 id 查询；不关心设施具体字段，仅保留对菜单配置中 facilityId → 农场名映射
             if (facilityId != null && facilityService.getById(facilityId) == null) {
                 return Result.error("未找到试验田设施");
             }
 
-            // 2) 匹配该设施所在农场对应的 device_push_data.client_id
-            String clientId = resolveClientIdForFacility(facilityId);
+            // 1) 先从菜单中找到 facilityId 对应的农场名；再用农场名到 IotProperties 精确匹配
+            String farmName = resolveFarmNameForFacility(facilityId);
+            IotProperties.CameraFarm farmCfg = resolveFarmConfig(farmName);
 
+            log.info("[试验田] facilityId={} -> 农场名={} -> farmCfg(name={}, clientId={}, stationName={}, ids={})",
+                    facilityId, farmName,
+                    farmCfg == null ? null : farmCfg.getName(),
+                    farmCfg == null ? null : farmCfg.getClientId(),
+                    farmCfg == null ? null : farmCfg.getStationName(),
+                    farmCfg == null ? null : farmCfg.getIds());
+
+            // 2) 环境/土壤/气象：用配置中的 clientId 查询 device_push_data
+            String clientId = farmCfg == null ? null : emptyToNull(farmCfg.getClientId());
             TestFieldDataDTO.TestFieldDataDTOBuilder builder = TestFieldDataDTO.builder();
-
-            // 3) 环境监测：近5天 温度 / 湿度
             builder.environment(buildEnvironmentData(clientId));
-
-            // 4) 土壤：最新 pH
             builder.soil(buildSoilData(clientId));
-
-            // 5) 气象：最新 pressure / wind_speed / rainfall / light_intensity / dew_temp / co2
             builder.weather(buildWeatherData(clientId));
 
-            // 6) 排水阀 & 水位计 实时数据
-            ExternalIotAggregate iot = fetchExternalIotData(facilityId);
-            builder.valve(buildValveData(iot));
-            builder.waterMeter(buildWaterMeterData(iot));
+            // 准备 IoT 基础参数
+            IotProperties.Platform platform = iotProperties.getPlatform();
+            String baseUrl = platform == null ? null : emptyToNull(platform.getBaseUrl());
+            String token   = platform == null ? null : emptyToNull(platform.getToken());
 
-            // 7) 虫情数据
+            // 3) IoT 平台：先拉 listAllDevices，再对每个排水阀/水位计分别调 deviceValues 拿实时值
+            ExternalIotAggregate iot = fetchExternalIotData(baseUrl, token, farmCfg);
+            builder.valves(buildValveItems(iot));
+            builder.waterMeter(buildWaterMeterItem(iot));
+            builder.cameras(buildCameras(iot));
+
+            // 4) 虫情
             builder.insectData(buildInsectData(facilityId));
 
             return Result.success(builder.build());
@@ -102,60 +106,64 @@ public class TestFieldController {
     }
 
     // ========================================================================
-    // 根据 facilityId 推断 device_push_data.client_id
-    // 策略：先从菜单配置中找到包含该 facilityId 的子项 → 父菜单名 → 再去所有 clientId 中包含匹配；
-    //      找不到则取所有 clientId 按字典序第一个
+    // facilityId → 农场名（从菜单配置中找到，找不到返回 null）
     // ========================================================================
     @SuppressWarnings("unchecked")
-    private String resolveClientIdForFacility(Long facilityId) {
-        String farmNameHint = null;
+    private String resolveFarmNameForFacility(Long facilityId) {
+        if (facilityId == null) return null;
         try {
             Map<String, Object> config = menuModelConfigService.getConfig();
             List<Map<String, Object>> menus = (List<Map<String, Object>>) config.get("menus");
-            if (menus != null) {
-                for (Map<String, Object> topMenu : menus) {
-                    Object children = topMenu.get("children");
-                    if (!(children instanceof List)) continue;
-                    for (Object childRaw : (List<?>) children) {
-                        if (!(childRaw instanceof Map)) continue;
-                        Map<String, Object> child = (Map<String, Object>) childRaw;
-                        Object fid = child.get("facilityId");
-                        if (fid != null && String.valueOf(fid).equals(String.valueOf(facilityId))) {
-                            farmNameHint = (String) topMenu.get("name");
-                            break;
-                        }
+            if (menus == null) return null;
+            for (Map<String, Object> topMenu : menus) {
+                Object children = topMenu.get("children");
+                if (!(children instanceof List)) continue;
+                for (Object childRaw : (List<?>) children) {
+                    if (!(childRaw instanceof Map)) continue;
+                    Map<String, Object> child = (Map<String, Object>) childRaw;
+                    Object fid = child.get("facilityId");
+                    if (fid != null && String.valueOf(fid).equals(String.valueOf(facilityId))) {
+                        return (String) topMenu.get("name");
                     }
-                    if (farmNameHint != null) break;
                 }
             }
         } catch (Exception e) {
             log.warn("解析菜单配置获取农场名失败, facilityId={}", facilityId, e);
         }
-
-        List<String> allClientIds = devicePushDataMapper.selectList(
-                new LambdaQueryWrapper<DevicePushData>()
-                        .select(DevicePushData::getClientId)
-                        .isNotNull(DevicePushData::getClientId)
-                        .groupBy(DevicePushData::getClientId)
-        ).stream().map(DevicePushData::getClientId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
-
-        if (farmNameHint != null) {
-            for (String cid : allClientIds) {
-                if (cid.contains(farmNameHint) || farmNameHint.contains(cid.substring(0, Math.min(3, cid.length())))) {
-                    return cid;
-                }
-            }
-        }
-
-        if (!allClientIds.isEmpty()) {
-            Collections.sort(allClientIds);
-            return allClientIds.get(0);
-        }
         return null;
     }
 
     // ========================================================================
-    // 环境监测：近5天每天一条（温/湿）
+    // 农场名 → 配置对象（从 IotProperties 中找精确匹配；找不到返回 null）
+    // ========================================================================
+    private IotProperties.CameraFarm resolveFarmConfig(String farmName) {
+        if (farmName == null) return null;
+        IotProperties.Camera camera = iotProperties.getCamera();
+        List<IotProperties.CameraFarm> farms = camera == null ? Collections.emptyList() : camera.getFarms();
+        if (farms == null || farms.isEmpty()) return null;
+
+        String key = farmName.replaceAll("\\s+", "");
+        for (IotProperties.CameraFarm f : farms) {
+            if (f == null || f.getName() == null) continue;
+            String n = f.getName().replaceAll("\\s+", "");
+            if (n.equalsIgnoreCase(key)) return f;
+        }
+        for (IotProperties.CameraFarm f : farms) {
+            if (f == null || f.getName() == null) continue;
+            String n = f.getName().replaceAll("\\s+", "");
+            if (n.contains(key) || key.contains(n)) return f;
+        }
+        return null;
+    }
+
+    private static String emptyToNull(String s) {
+        if (s == null) return null;
+        String v = s.trim();
+        return v.isEmpty() ? null : v;
+    }
+
+    // ========================================================================
+    // 环境 / 土壤 / 气象
     // ========================================================================
     private List<TestFieldDataDTO.EnvData> buildEnvironmentData(String clientId) {
         List<TestFieldDataDTO.EnvData> result = new ArrayList<>();
@@ -176,12 +184,11 @@ public class TestFieldController {
                             .last("LIMIT 1")
             );
 
-            TestFieldDataDTO.EnvData item = TestFieldDataDTO.EnvData.builder()
+            result.add(TestFieldDataDTO.EnvData.builder()
                     .date(target.format(DATE_FMT))
                     .ambientTemperature(data != null ? data.getAmbientTemperature() : null)
                     .ambientHumidity(data != null ? data.getAmbientHumidity() : null)
-                    .build();
-            result.add(item);
+                    .build());
         }
         return result;
     }
@@ -223,34 +230,64 @@ public class TestFieldController {
     }
 
     // ========================================================================
-    // 排水阀 / 水位计 数据封装
+    // 排水阀 / 水位计 / 摄像头
+    //
+    // 说明：
+    //   - 排水阀改为数组，每个元素里包含从 deviceValues 拿到的实时压力、开度、电流、电压等
+    //   - 水位计改为单个对象（取第一个），里面包含实时的 waterLevel / hasWater / status
     // ========================================================================
-    private TestFieldDataDTO.ValveData buildValveData(ExternalIotAggregate iot) {
-        if (iot == null || iot.getValveDevices() == null || iot.getValveDevices().isEmpty()) return null;
-        return TestFieldDataDTO.ValveData.builder()
-                .status(iot.getValveStatusText())
-                .pressure1(iot.getPressure1())
-                .pressure2(iot.getPressure2())
-                .pos(iot.getPos())
-                .current(iot.getCurrent())
-                .voltage(iot.getVoltage())
-                .protectTorque(iot.getProtectTorque())
-                .count(iot.getValveDevices().size())
-                .build();
+    private List<TestFieldDataDTO.ValveItem> buildValveItems(ExternalIotAggregate iot) {
+        if (iot == null || iot.getValveItems() == null || iot.getValveItems().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return iot.getValveItems();
     }
 
-    private TestFieldDataDTO.WaterMeterData buildWaterMeterData(ExternalIotAggregate iot) {
-        if (iot == null || iot.getWaterMeterDevices() == null || iot.getWaterMeterDevices().isEmpty()) return null;
-        return TestFieldDataDTO.WaterMeterData.builder()
-                .waterLevel(iot.getWaterLevel())
-                .hasWater(iot.getHasWater())
-                .status(iot.getWaterStatus())
-                .count(iot.getWaterMeterDevices().size())
-                .build();
+    private TestFieldDataDTO.WaterMeterItem buildWaterMeterItem(ExternalIotAggregate iot) {
+        if (iot == null || iot.getWaterMeterItems() == null || iot.getWaterMeterItems().isEmpty()) return null;
+        return iot.getWaterMeterItems().get(0);
+    }
+
+    private List<TestFieldDataDTO.CameraItem> buildCameras(ExternalIotAggregate iot) {
+        if (iot == null || iot.getCameraDevices() == null || iot.getCameraDevices().isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<TestFieldDataDTO.CameraItem> result = new ArrayList<>();
+        for (Map<String, Object> cam : iot.getCameraDevices()) {
+            result.add(TestFieldDataDTO.CameraItem.builder()
+                    .deviceId(toStringNull(cam.get("id")))
+                    .name(toStringNull(cam.get("name")))
+                    .enable(cam.get("enable"))
+                    .status(cam.get("status"))
+                    .gbId(toStringNull(cam.get("gb_id")))
+                    .httpsFlvUrl(trimUrl(cam.get("https_flv_url")))
+                    .stationName(toStringNull(cam.get("station_name")))
+                    .deviceTypeName(toStringNull(cam.get("device_type_name")))
+                    .build());
+        }
+        return result;
+    }
+
+    private static String toStringNull(Object o) {
+        if (o == null) return null;
+        if (o instanceof String) {
+            String v = ((String) o).trim();
+            return v.isEmpty() ? null : v;
+        }
+        return String.valueOf(o);
+    }
+
+    private static String trimUrl(Object urlObj) {
+        if (urlObj == null) return null;
+        String s = String.valueOf(urlObj).trim();
+        if (s.isEmpty()) return null;
+        while (s.startsWith("`") || s.startsWith("'") || s.startsWith("\"")) s = s.substring(1).trim();
+        while (s.endsWith("`")   || s.endsWith("'")   || s.endsWith("\""))   s = s.substring(0, s.length() - 1).trim();
+        return s;
     }
 
     // ========================================================================
-    // 虫情数据：解析 insect_data.detect_result 中 JSON 数组做虫名聚合
+    // 虫情
     // ========================================================================
     private TestFieldDataDTO.InsectData buildInsectData(Long facilityId) {
         String imei = resolveInsectImei(facilityId);
@@ -285,12 +322,8 @@ public class TestFieldController {
 
                     try {
                         String cleanJson = detectResult.substring(startIndex, endIndex + 1)
-                                .replace("\\n", "")
-                                .replace("\\r", "")
-                                .replace("\\t", "")
-                                .replace("\n", "")
-                                .replace("\r", "")
-                                .replace("\\", "");
+                                .replace("\\n", "").replace("\\r", "").replace("\\t", "")
+                                .replace("\n", "").replace("\r", "").replace("\\", "");
 
                         List<Map<String, Object>> detectList = objectMapper.readValue(
                                 cleanJson, new TypeReference<List<Map<String, Object>>>() {});
@@ -322,10 +355,6 @@ public class TestFieldController {
                 .build();
     }
 
-    /**
-     * 尝试从菜单配置中找到当前 facilityId 对应节点的虫情设备号(insectDeviceId)；
-     * 未找到时返回 null，此时会退化为按记录时间倒序的最近 100 条。
-     */
     @SuppressWarnings("unchecked")
     private String resolveInsectImei(Long facilityId) {
         if (facilityId == null) return null;
@@ -353,20 +382,18 @@ public class TestFieldController {
     }
 
     // ========================================================================
-    // 外部 IoT 拉取
+    // 外部 IoT 拉取：
+    //   1) listAllDevices 获取完整设备列表，并按配置的 ids / stationName 过滤
+    //   2) 对每个排水阀 / 水位计分别调用 deviceValues，拿到真实实时值后按设备返回
     // ========================================================================
-    private ExternalIotAggregate fetchExternalIotData(Long facilityId) {
-        if (iotBaseUrl == null || iotBaseUrl.trim().isEmpty()
-                || iotToken == null || iotToken.trim().isEmpty()) {
-            return null;
-        }
+    private ExternalIotAggregate fetchExternalIotData(String baseUrl, String token, IotProperties.CameraFarm farmCfg) {
+        if (baseUrl == null || token == null || farmCfg == null) return null;
 
         try {
-            List<String> farmKeywords = resolveFarmKeywordsForFacility(facilityId);
-            if (farmKeywords.isEmpty()) return null;
-
-            String listUrl = appendPath(iotBaseUrl, "listAllDevices");
-            Map<String, Object> listPayload = Collections.singletonMap("token", iotToken);
+            // 1) listAllDevices
+            String listUrl = appendPath(baseUrl, "listAllDevices");
+            Map<String, Object> listPayload = new LinkedHashMap<>();
+            listPayload.put("token", token);
             String listResp = postJson(listUrl, listPayload);
             if (listResp == null) return null;
 
@@ -381,143 +408,121 @@ public class TestFieldController {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> allDevices = (List<Map<String, Object>>) rawData;
 
+            // 2) 按配置筛选
+            List<String> cameraIds = new ArrayList<>();
+            if (farmCfg.getIds() != null) {
+                for (String id : farmCfg.getIds()) {
+                    if (id != null && !id.trim().isEmpty()) cameraIds.add(id.trim());
+                }
+            }
+            Set<String> cameraIdSet = new HashSet<>(cameraIds);
+            String stationKeyword = emptyToNull(farmCfg.getStationName());
+
+            List<Map<String, Object>> cameraDevices = new ArrayList<>();
             List<Map<String, Object>> valveDevices = new ArrayList<>();
             List<Map<String, Object>> waterMeterDevices = new ArrayList<>();
+
             for (Map<String, Object> device : allDevices) {
+                if (device == null) continue;
                 Object rawType = device.get("device_type");
-                Object station = device.get("station_name");
-                if (rawType == null || station == null) continue;
                 int deviceType;
                 try {
-                    deviceType = Integer.parseInt(String.valueOf(rawType));
-                } catch (Exception ex) { continue; }
-                if (deviceType == DEVICE_TYPE_CAMERA) continue;
+                    deviceType = rawType == null ? -1 : Integer.parseInt(String.valueOf(rawType));
+                } catch (Exception ignored) { deviceType = -1; }
+
+                if (deviceType == DEVICE_TYPE_CAMERA) {
+                    if (!cameraIdSet.isEmpty() && device.get("id") != null
+                            && cameraIdSet.contains(String.valueOf(device.get("id")).trim())) {
+                        cameraDevices.add(device);
+                    }
+                    continue;
+                }
+
+                if (stationKeyword == null) continue;
+                Object station = device.get("station_name");
+                if (station == null) continue;
                 String stationName = String.valueOf(station);
-                boolean matchFarm = farmKeywords.stream().anyMatch(stationName::contains);
-                if (!matchFarm) continue;
-                if (deviceType == DEVICE_TYPE_VALVE) valveDevices.add(device);
-                else if (deviceType == DEVICE_TYPE_WATER_LEVEL) waterMeterDevices.add(device);
+                if (!stationName.contains(stationKeyword)) continue;
+
+                if (deviceType == DEVICE_TYPE_VALVE)              valveDevices.add(device);
+                else if (deviceType == DEVICE_TYPE_WATER_LEVEL)    waterMeterDevices.add(device);
             }
 
-            ExternalIotAggregate result = new ExternalIotAggregate();
-            result.setValveDevices(valveDevices);
-            result.setWaterMeterDevices(waterMeterDevices);
+            log.info("[试验田-IoT] 农场={} 过滤后：摄像头={} 个, 排水阀={} 个, 水位计={} 个",
+                    farmCfg.getName(), cameraDevices.size(), valveDevices.size(), waterMeterDevices.size());
 
-            // 聚合排水阀实时值
-            BigDecimal pressure1Sum = BigDecimal.ZERO;
-            BigDecimal pressure2Sum = BigDecimal.ZERO;
-            int p1 = 0, p2 = 0, onlineValve = 0, openValve = 0;
+            ExternalIotAggregate result = new ExternalIotAggregate();
+            result.setCameraDevices(cameraDevices);
+
+            // 3) 对每个排水阀单独调 deviceValues 拿真实实时值
+            List<TestFieldDataDTO.ValveItem> valveItems = new ArrayList<>();
             for (Map<String, Object> valve : valveDevices) {
                 Object id = valve.get("id");
                 if (id == null) continue;
-                Map<String, Object> values = fetchDeviceValues(String.valueOf(id));
-                if (values == null) continue;
-
-                Object status = values.get("status");
-                if (status != null && !"0".equals(String.valueOf(status))) {
-                    onlineValve++;
-                    openValve++;
+                String deviceId = String.valueOf(id);
+                Map<String, Object> values = fetchDeviceValues(baseUrl, token, deviceId);
+                if (values == null) {
+                    valveItems.add(TestFieldDataDTO.ValveItem.builder()
+                            .deviceId(deviceId)
+                            .name(toStringNull(valve.get("name")))
+                            .stationName(toStringNull(valve.get("station_name")))
+                            .build());
+                    continue;
                 }
-
-                BigDecimal v1 = toBigDecimal(values.get("pressure1"));
-                BigDecimal v2 = toBigDecimal(values.get("pressure2"));
-                if (v1 != null) { pressure1Sum = pressure1Sum.add(v1); p1++; }
-                if (v2 != null) { pressure2Sum = pressure2Sum.add(v2); p2++; }
-
-                if (result.getPos() == null) {
-                    result.setPos(toBigDecimal(values.get("pos")));
-                    result.setCurrent(toBigDecimal(values.get("i")));
-                    result.setVoltage(toBigDecimal(values.get("v")));
-                    result.setProtectTorque(toBigDecimal(values.get("protectTorque")));
-                }
+                valveItems.add(TestFieldDataDTO.ValveItem.builder()
+                        .deviceId(deviceId)
+                        .name(toStringNull(valve.get("name")))
+                        .stationName(toStringNull(valve.get("station_name")))
+                        .pressure1(toBigDecimal(values.get("pressure1")))
+                        .pressure2(toBigDecimal(values.get("pressure2")))
+                        .pos(toBigDecimal(values.get("pos")))
+                        .current(toBigDecimal(values.get("i")))
+                        .voltage(toBigDecimal(values.get("v")))
+                        .protectTorque(toBigDecimal(values.get("protectTorque")))
+                        .status(values.get("status") == null ? null : String.valueOf(values.get("status")))
+                        .build());
             }
-            if (p1 > 0) result.setPressure1(round2(pressure1Sum.divide(BigDecimal.valueOf(p1), 4, BigDecimal.ROUND_HALF_UP)));
-            if (p2 > 0) result.setPressure2(round2(pressure2Sum.divide(BigDecimal.valueOf(p2), 4, BigDecimal.ROUND_HALF_UP)));
-            result.setValveStatusText(String.format("运行中 - 在线 %d 台 / 共 %d 台（已开启 %d 台）",
-                    onlineValve, valveDevices.size(), openValve));
 
-            // 聚合水位计实时值
-            BigDecimal waterLevelSum = BigDecimal.ZERO;
-            int waterLevelCount = 0;
-            int hasWaterCount = 0;
+            // 4) 对每个水位计单独调 deviceValues 拿真实实时值
+            List<TestFieldDataDTO.WaterMeterItem> waterMeterItems = new ArrayList<>();
             for (Map<String, Object> meter : waterMeterDevices) {
                 Object id = meter.get("id");
                 if (id == null) continue;
-                Map<String, Object> values = fetchDeviceValues(String.valueOf(id));
-                if (values == null) continue;
-
-                BigDecimal wl = toBigDecimal(values.get("waterLevel"));
-                if (wl != null) { waterLevelSum = waterLevelSum.add(wl); waterLevelCount++; }
-                Object hasWater = values.get("hasWater");
-                if (hasWater != null) {
-                    try {
-                        int hw = Integer.parseInt(String.valueOf(hasWater));
-                        if (hw > 0) hasWaterCount++;
-                    } catch (Exception ignored) {}
+                String deviceId = String.valueOf(id);
+                Map<String, Object> values = fetchDeviceValues(baseUrl, token, deviceId);
+                if (values == null) {
+                    waterMeterItems.add(TestFieldDataDTO.WaterMeterItem.builder()
+                            .deviceId(deviceId)
+                            .name(toStringNull(meter.get("name")))
+                            .stationName(toStringNull(meter.get("station_name")))
+                            .build());
+                    continue;
                 }
-            }
-            if (waterLevelCount > 0) {
-                result.setWaterLevel(round2(waterLevelSum.divide(BigDecimal.valueOf(waterLevelCount), 4, BigDecimal.ROUND_HALF_UP)));
-            }
-            result.setHasWater(hasWaterCount);
-            if (!waterMeterDevices.isEmpty()) {
-                result.setWaterStatus(hasWaterCount == waterMeterDevices.size() ? "正常"
-                        : (hasWaterCount > 0 ? "部分有水" : "无水"));
+                waterMeterItems.add(TestFieldDataDTO.WaterMeterItem.builder()
+                        .deviceId(deviceId)
+                        .name(toStringNull(meter.get("name")))
+                        .stationName(toStringNull(meter.get("station_name")))
+                        .waterLevel(toBigDecimal(values.get("waterLevel")))
+                        .hasWater(values.get("hasWater"))
+                        .status(values.get("status") == null ? null : String.valueOf(values.get("status")))
+                        .build());
             }
 
+            result.setValveItems(valveItems);
+            result.setWaterMeterItems(waterMeterItems);
             return result;
         } catch (Exception e) {
-            log.error("对接外部 IoT 接口失败, facilityId={}", facilityId, e);
+            log.error("对接外部 IoT 接口失败, farm={}", farmCfg == null ? null : farmCfg.getName(), e);
             return null;
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private List<String> resolveFarmKeywordsForFacility(Long facilityId) {
-        List<String> keywords = new ArrayList<>();
+    private Map<String, Object> fetchDeviceValues(String baseUrl, String token, String deviceId) {
         try {
-            Map<String, Object> config = menuModelConfigService.getConfig();
-            List<Map<String, Object>> menus = (List<Map<String, Object>>) config.get("menus");
-            if (menus != null) {
-                for (Map<String, Object> topMenu : menus) {
-                    Object farmName = topMenu.get("name");
-                    if (farmName == null) continue;
-                    Object children = topMenu.get("children");
-                    boolean facilityMatched = false;
-                    if (children instanceof List) {
-                        for (Object childRaw : (List<?>) children) {
-                            if (!(childRaw instanceof Map)) continue;
-                            Map<String, Object> child = (Map<String, Object>) childRaw;
-                            Object fid = child.get("facilityId");
-                            if (fid != null && String.valueOf(fid).equals(String.valueOf(facilityId))) {
-                                facilityMatched = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (facilityMatched) {
-                        keywords.add(0, String.valueOf(farmName));
-                    } else {
-                        keywords.add(String.valueOf(farmName));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("解析菜单配置失败", e);
-        }
-
-        // 保底关键字：如果 IoT 平台的 station_name 里直接用了"维明农场/红耕农场"字样
-        if (keywords.stream().noneMatch(k -> k.contains("维明"))) keywords.add("维明农场");
-        if (keywords.stream().noneMatch(k -> k.contains("红耕"))) keywords.add("红耕农场");
-        return keywords;
-    }
-
-    private Map<String, Object> fetchDeviceValues(String deviceId) {
-        try {
-            String url = appendPath(iotBaseUrl, "deviceValues");
+            String url = appendPath(baseUrl, "deviceValues");
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("deviceId", deviceId);
-            payload.put("token", iotToken);
+            payload.put("token", token);
             String resp = postJson(url, payload);
             if (resp == null) return null;
 
@@ -568,49 +573,17 @@ public class TestFieldController {
         }
     }
 
-    private static BigDecimal round2(BigDecimal v) {
-        if (v == null) return null;
-        return v.setScale(2, BigDecimal.ROUND_HALF_UP);
-    }
-
-    /** 外部 IoT 聚合中间对象 */
+    /** 外部 IoT 聚合中间对象（摄像头保留 map，排水阀 / 水位计直接用 DTO 列表） */
     private static class ExternalIotAggregate {
-        private List<Map<String, Object>> valveDevices;
-        private List<Map<String, Object>> waterMeterDevices;
-        private String valveStatusText;
-        private BigDecimal pressure1;
-        private BigDecimal pressure2;
-        private BigDecimal pos;
-        private BigDecimal current;
-        private BigDecimal voltage;
-        private BigDecimal protectTorque;
-        private BigDecimal waterLevel;
-        private Integer hasWater;
-        private String waterStatus;
+        private List<Map<String, Object>> cameraDevices;
+        private List<TestFieldDataDTO.ValveItem> valveItems;
+        private List<TestFieldDataDTO.WaterMeterItem> waterMeterItems;
 
-        public List<Map<String, Object>> getValveDevices() { return valveDevices; }
-        public void setValveDevices(List<Map<String, Object>> v) { this.valveDevices = v; }
-        public List<Map<String, Object>> getWaterMeterDevices() { return waterMeterDevices; }
-        public void setWaterMeterDevices(List<Map<String, Object>> v) { this.waterMeterDevices = v; }
-        public String getValveStatusText() { return valveStatusText; }
-        public void setValveStatusText(String v) { this.valveStatusText = v; }
-        public BigDecimal getPressure1() { return pressure1; }
-        public void setPressure1(BigDecimal v) { this.pressure1 = v; }
-        public BigDecimal getPressure2() { return pressure2; }
-        public void setPressure2(BigDecimal v) { this.pressure2 = v; }
-        public BigDecimal getPos() { return pos; }
-        public void setPos(BigDecimal v) { this.pos = v; }
-        public BigDecimal getCurrent() { return current; }
-        public void setCurrent(BigDecimal v) { this.current = v; }
-        public BigDecimal getVoltage() { return voltage; }
-        public void setVoltage(BigDecimal v) { this.voltage = v; }
-        public BigDecimal getProtectTorque() { return protectTorque; }
-        public void setProtectTorque(BigDecimal v) { this.protectTorque = v; }
-        public BigDecimal getWaterLevel() { return waterLevel; }
-        public void setWaterLevel(BigDecimal v) { this.waterLevel = v; }
-        public Integer getHasWater() { return hasWater; }
-        public void setHasWater(Integer v) { this.hasWater = v; }
-        public String getWaterStatus() { return waterStatus; }
-        public void setWaterStatus(String v) { this.waterStatus = v; }
+        public List<Map<String, Object>> getCameraDevices() { return cameraDevices; }
+        public void setCameraDevices(List<Map<String, Object>> v) { this.cameraDevices = v; }
+        public List<TestFieldDataDTO.ValveItem> getValveItems() { return valveItems; }
+        public void setValveItems(List<TestFieldDataDTO.ValveItem> v) { this.valveItems = v; }
+        public List<TestFieldDataDTO.WaterMeterItem> getWaterMeterItems() { return waterMeterItems; }
+        public void setWaterMeterItems(List<TestFieldDataDTO.WaterMeterItem> v) { this.waterMeterItems = v; }
     }
 }

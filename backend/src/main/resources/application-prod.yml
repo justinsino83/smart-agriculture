@@ -69,10 +69,29 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
-# 外部 IoT 设备平台（水位计/排水阀）
+# 外部 IoT 设备平台（水位计/排水阀/摄像头）
+#
+# iot.platform.base-url / token ：对接外部 IoT 平台的基础地址与鉴权
+# iot.camera.farms[i]          ：每个农场一份配置
+#   .name                       ：菜单里显示的农场名（如"维明农场"/"红耕农场"）
+#   .clientId                   ：device_push_data 表中对应农场的 client_id
+#   .stationName                ：IoT listAllDevices 里的 station_name 关键字
+#   .ids                        ：该农场下的摄像头 deviceId 列表
 iot:
   platform:
     base-url: https://hualin.xyune.com:8443/api/iot/manage/api
     token: BCACAFFC658149958B6401A3F0179281
     connect-timeout: 15000
     read-timeout: 15000
+  camera:
+    farms:
+      - name: 维明农场
+        clientId: 2604073202TXD-01
+        stationName: 老叶维明农田
+        ids:
+          - "2067169374367645696"
+      - name: 红耕农场
+        clientId: 2604073202TXD-02
+        stationName: 根思金禾农田
+        ids:
+          - "2067194219855872000"
