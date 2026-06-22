@@ -16,12 +16,12 @@ public interface SoilService extends IService<SoilSensor> {
     /**
      * 获取传感器实时数据
      */
-    SoilData getRealTimeData(Long sensorId);
+    SoilData getRealTimeData(String clientId);
     
     /**
      * 获取传感器历史数据
      */
-    List<Map<String, Object>> getHistoryData(Long sensorId, LocalDateTime start, LocalDateTime end);
+    List<Map<String, Object>> getHistoryData(String clientId, LocalDateTime start, LocalDateTime end);
     
     /**
      * 获取所有地块的土壤概况
@@ -31,12 +31,12 @@ public interface SoilService extends IService<SoilSensor> {
     /**
      * 分析土壤数据趋势
      */
-    Map<String, Object> analyzeTrend(Long sensorId, int days);
+    Map<String, Object> analyzeTrend(String clientId, int days);
     
     /**
      * 获取历史数据（分页）
      */
-    Map<String, Object> getHistoryDataPage(Long sensorId, LocalDateTime start, LocalDateTime end, int page, int size);
+    Map<String, Object> getHistoryDataPage(String clientId, LocalDateTime start, LocalDateTime end, int page, int size);
     
     /**
      * 获取土壤监测统计

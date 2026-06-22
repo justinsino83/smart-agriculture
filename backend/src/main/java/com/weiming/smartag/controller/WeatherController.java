@@ -27,11 +27,11 @@ public class WeatherController {
      */
     @GetMapping("/current")
     public Result<Map<String, Object>> getCurrentWeather(
-            @RequestParam(required = false) String deviceCode) {
+            @RequestParam(required = false) String clientId) {
         try {
-            return Result.success(weatherService.getCurrentWeather(deviceCode));
+            return Result.success(weatherService.getCurrentWeather(clientId));
         } catch (Exception e) {
-            log.error("获取当前天气失败, deviceCode: {}", deviceCode, e);
+            log.error("获取当前天气失败, clientId: {}", clientId, e);
             return Result.fail("获取天气失败: " + e.getMessage());
         }
     }
@@ -41,13 +41,13 @@ public class WeatherController {
      */
     @GetMapping("/trend")
     public Result<Map<String, Object>> get24HourTrend(
-            @RequestParam(required = false) String deviceCode,
+            @RequestParam(required = false) String clientId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
         try {
-            return Result.success(weatherService.get24HourTrend(deviceCode, startTime, endTime));
+            return Result.success(weatherService.get24HourTrend(clientId, startTime, endTime));
         } catch (Exception e) {
-            log.error("获取24小时趋势失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            log.error("获取24小时趋势失败, clientId: {}, startTime: {}, endTime: {}", clientId, startTime, endTime, e);
             return Result.fail("获取趋势失败: " + e.getMessage());
         }
     }
@@ -57,13 +57,13 @@ public class WeatherController {
      */
     @GetMapping("/humidity-trend")
     public Result<Map<String, Object>> get24HourHumidityTrend(
-            @RequestParam(required = false) String deviceCode,
+            @RequestParam(required = false) String clientId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
         try {
-            return Result.success(weatherService.get24HourHumidityTrend(deviceCode, startTime, endTime));
+            return Result.success(weatherService.get24HourHumidityTrend(clientId, startTime, endTime));
         } catch (Exception e) {
-            log.error("获取24小时湿度趋势失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            log.error("获取24小时湿度趋势失败, clientId: {}, startTime: {}, endTime: {}", clientId, startTime, endTime, e);
             return Result.fail("获取趋势失败: " + e.getMessage());
         }
     }
@@ -73,13 +73,13 @@ public class WeatherController {
      */
     @GetMapping("/wind-direction-trend")
     public Result<Map<String, Object>> get24HourWindDirectionTrend(
-            @RequestParam(required = false) String deviceCode,
+            @RequestParam(required = false) String clientId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
         try {
-            return Result.success(weatherService.get24HourWindDirectionTrend(deviceCode, startTime, endTime));
+            return Result.success(weatherService.get24HourWindDirectionTrend(clientId, startTime, endTime));
         } catch (Exception e) {
-            log.error("获取24小时风向趋势失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            log.error("获取24小时风向趋势失败, clientId: {}, startTime: {}, endTime: {}", clientId, startTime, endTime, e);
             return Result.fail("获取趋势失败: " + e.getMessage());
         }
     }
@@ -102,20 +102,20 @@ public class WeatherController {
      */
     @GetMapping("/all")
     public Result<Map<String, Object>> getAll(
-            @RequestParam(required = false) String deviceCode,
+            @RequestParam(required = false) String clientId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
         try {
             Map<String, Object> all = Map.of(
-                    "current", weatherService.getCurrentWeather(deviceCode),
-                    "trend", weatherService.get24HourTrend(deviceCode, startTime, endTime),
-                    "humidityTrend", weatherService.get24HourHumidityTrend(deviceCode, startTime, endTime),
-                    "windDirectionTrend", weatherService.get24HourWindDirectionTrend(deviceCode, startTime, endTime),
+                    "current", weatherService.getCurrentWeather(clientId),
+                    "trend", weatherService.get24HourTrend(clientId, startTime, endTime),
+                    "humidityTrend", weatherService.get24HourHumidityTrend(clientId, startTime, endTime),
+                    "windDirectionTrend", weatherService.get24HourWindDirectionTrend(clientId, startTime, endTime),
                     "forecast", weatherService.getForecast()
             );
             return Result.success(all);
         } catch (Exception e) {
-            log.error("获取全部天气数据失败, deviceCode: {}, startTime: {}, endTime: {}", deviceCode, startTime, endTime, e);
+            log.error("获取全部天气数据失败, clientId: {}, startTime: {}, endTime: {}", clientId, startTime, endTime, e);
             return Result.fail("获取天气数据失败: " + e.getMessage());
         }
     }

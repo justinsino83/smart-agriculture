@@ -1,8 +1,9 @@
 package com.weiming.smartag.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.weiming.smartag.entity.DevicePushData;
 import com.weiming.smartag.entity.SoilData;
-import com.weiming.smartag.entity.SoilSensor;
-import com.weiming.smartag.mapper.SoilDataMapper;
+import com.weiming.smartag.mapper.DevicePushDataMapper;
 import com.weiming.smartag.mapper.SoilSensorMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,12 +12,20 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * SoilServiceImpl 单元测试
@@ -28,150 +37,105 @@ class SoilServiceImplTest {
     private SoilSensorMapper soilSensorMapper;
 
     @Mock
-    private SoilDataMapper soilDataMapper;
+    private DevicePushDataMapper devicePushDataMapper;
 
     @InjectMocks
     private SoilServiceImpl soilService;
 
-    private SoilSensor testSensor;
-    private SoilData testData;
+    private DevicePushData testPushData;
 
     @BeforeEach
     void setUp() {
-        testSensor = new SoilSensor();
-        testSensor.setId(1L);
-        testSensor.setDeviceCode("S001");
-        testSensor.setDeviceName("1号田传感器");
-        testSensor.setFieldId(1L);
-        testSensor.setStatus(1);
-        testSensor.setLocation("1号田");
-
-        testData = new SoilData();
-        testData.setId(1L);
-        testData.setSensorId(1L);
-        testData.setMoisture(45.5);
-        testData.setTemperature(22.0);
-        testData.setPh(6.8);
-        testData.setEc(1.2);
-        testData.setCollectTime(LocalDateTime.now());
+        testPushData = new DevicePushData();
+        testPushData.setId(1L);
+        testPushData.setClientId("2604073202TXD-01");
+        testPushData.setSoilPh(new BigDecimal("6.80"));
+        testPushData.setDetectedTime(LocalDateTime.now());
+        testPushData.setCreateTime(LocalDateTime.now());
     }
 
     @Test
     void testGetRealTimeData() {
-        when(soilDataMapper.selectLatestBySensorId(1L)).thenReturn(testData);
+        when(devicePushDataMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(testPushData);
 
-        SoilData result = soilService.getRealTimeData(1L);
+        SoilData result = soilService.getRealTimeData("2604073202TXD-01");
 
         assertNotNull(result);
-        assertEquals(45.5, result.getMoisture());
-        assertEquals(1L, result.getSensorId());
-        verify(soilDataMapper).selectLatestBySensorId(1L);
+        assertEquals(6.8, result.getPh());
+        assertNull(result.getMoisture());
+        verify(devicePushDataMapper).selectOne(any(LambdaQueryWrapper.class));
     }
 
     @Test
-    void testGetHistoryData() {
-        LocalDateTime start = LocalDateTime.now().minusDays(1);
-        LocalDateTime end = LocalDateTime.now();
-        List<SoilData> mockList = Collections.singletonList(testData);
+    void testGetHistoryDataPage() {
+        when(devicePushDataMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(devicePushDataMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Collections.singletonList(testPushData));
 
-        when(soilDataMapper.selectHistoryData(1L, start, end)).thenReturn(mockList);
-
-//        List<SoilData> result = soilService.getHistoryData(1L, start, end);
-
-//        assertNotNull(result);
-//        assertEquals(1, result.size());
-//        assertEquals(45.5, result.get(0).getMoisture());
-    }
-
-    @Test
-    void testGetSoilOverview() {
-        when(soilSensorMapper.selectOnlineSensors()).thenReturn(Collections.singletonList(testSensor));
-        when(soilDataMapper.selectLatestBySensorId(1L)).thenReturn(testData);
-
-        List<Map<String, Object>> result = soilService.getSoilOverview();
+        Map<String, Object> result = soilService.getHistoryDataPage(
+                "2604073202TXD-01",
+                LocalDateTime.now().minusDays(1),
+                LocalDateTime.now(),
+                1,
+                20
+        );
 
         assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("1号田传感器", result.get(0).get("deviceName"));
-        assertNotNull(result.get(0).get("healthStatus"));
+        assertEquals(1L, result.get("total"));
+        assertEquals(1, result.get("page"));
+        assertEquals(20, result.get("size"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> list = (List<Map<String, Object>>) result.get("list");
+        assertEquals(1, list.size());
+        assertEquals(6.8, list.get(0).get("ph"));
     }
 
     @Test
     void testEvaluateHealth_Optimal() {
         SoilData data = new SoilData();
-        data.setMoisture(50.0);
         data.setPh(6.5);
 
         Map<String, Object> health = soilService.evaluateHealth(data);
 
         assertNotNull(health);
-        assertEquals(100, health.get("score"));
+        assertEquals(95, health.get("score"));
         assertEquals("excellent", health.get("level"));
-        assertEquals("optimal", health.get("moistureStatus"));
         assertEquals("optimal", health.get("phStatus"));
     }
 
     @Test
-    void testEvaluateHealth_PoorMoisture() {
-        SoilData data = new SoilData();
-        data.setMoisture(15.0);
-        data.setPh(6.5);
-
-        Map<String, Object> health = soilService.evaluateHealth(data);
-
-        assertNotNull(health);
-        assertEquals("needs_attention", health.get("level"));
-        assertEquals("poor", health.get("moistureStatus"));
-        @SuppressWarnings("unchecked")
-        List<String> suggestions = (List<String>) health.get("suggestions");
-        assertTrue(suggestions.size() > 0);
-    }
-
-    @Test
     void testGetAlerts() {
-        SoilData alertData = new SoilData();
-        alertData.setMoisture(15.0); // 低于20触发预警
-        alertData.setPh(5.0); // 低于5.5触发预警
-        alertData.setCollectTime(LocalDateTime.now());
+        DevicePushData alertData = new DevicePushData();
+        alertData.setClientId("2604073202TXD-01");
+        alertData.setSoilPh(new BigDecimal("5.00"));
+        alertData.setDetectedTime(LocalDateTime.now());
+        alertData.setCreateTime(LocalDateTime.now());
 
-        when(soilSensorMapper.selectOnlineSensors()).thenReturn(Collections.singletonList(testSensor));
-        when(soilDataMapper.selectLatestBySensorId(1L)).thenReturn(alertData);
+        when(devicePushDataMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(Collections.singletonList(alertData));
+        when(devicePushDataMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(alertData);
 
         List<Map<String, Object>> alerts = soilService.getAlerts();
 
         assertNotNull(alerts);
-        assertTrue(alerts.size() >= 2);
-        assertTrue(alerts.stream().anyMatch(a -> "moisture".equals(a.get("type"))));
-        assertTrue(alerts.stream().anyMatch(a -> "ph".equals(a.get("type"))));
-    }
-
-    @Test
-    void testGetIrrigationRecommendations() {
-        SoilData dryData = new SoilData();
-        dryData.setMoisture(30.0);
-        dryData.setCollectTime(LocalDateTime.now());
-
-        when(soilSensorMapper.selectOnlineSensors()).thenReturn(Collections.singletonList(testSensor));
-        when(soilDataMapper.selectLatestBySensorId(1L)).thenReturn(dryData);
-
-        List<Map<String, Object>> recommendations = soilService.getIrrigationRecommendations();
-
-        assertNotNull(recommendations);
-        assertFalse(recommendations.isEmpty());
-        assertEquals("1号田", recommendations.get(0).get("fieldName"));
+        assertEquals(1, alerts.size());
+        assertEquals("ph", alerts.get(0).get("type"));
+        verify(devicePushDataMapper, times(1)).selectList(any(LambdaQueryWrapper.class));
+        verify(devicePushDataMapper, times(1)).selectOne(any(LambdaQueryWrapper.class));
     }
 
     @Test
     void testGetStatistics() {
-        when(soilSensorMapper.selectOnlineSensors()).thenReturn(Collections.singletonList(testSensor));
-        when(soilDataMapper.selectLatestBySensorId(1L)).thenReturn(testData);
-        when(soilSensorMapper.selectCount(any())).thenReturn(1L);
+        when(devicePushDataMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(Collections.singletonList(testPushData));
+        when(devicePushDataMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(testPushData);
 
         Map<String, Object> stats = soilService.getStatistics();
 
         assertNotNull(stats);
-        assertEquals(1L, stats.get("totalSensors"));
-        assertNotNull(stats.get("avgMoisture"));
-        assertNotNull(stats.get("avgTemperature"));
+        assertEquals(1, stats.get("totalSensors"));
+        assertEquals(1, stats.get("onlineSensors"));
+        assertEquals(100L, stats.get("onlineRate"));
+        assertEquals(6.8, stats.get("avgPh"));
+        assertTrue(((Integer) stats.get("alertCount")) >= 0);
     }
 }

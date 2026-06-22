@@ -1,6 +1,7 @@
 package com.weiming.smartag.common;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -88,6 +89,14 @@ public class GlobalExceptionHandler {
     public Result<?> handleNoSuchElementException(NoSuchElementException e) {
         log.warn("资源不存在: {}", e.getMessage());
         return Result.error(404, "请求的资源不存在");
+    }
+
+    /**
+     * 客户端主动中断连接
+     */
+    @ExceptionHandler(ClientAbortException.class)
+    public void handleClientAbortException(ClientAbortException e) {
+        log.warn("客户端中断连接: {}", e.getMessage());
     }
 
     /**

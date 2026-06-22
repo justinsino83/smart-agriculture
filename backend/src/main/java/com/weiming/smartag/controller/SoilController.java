@@ -40,16 +40,16 @@ public class SoilController {
     /**
      * 获取传感器实时数据
      */
-    @GetMapping("/realtime/{sensorId}")
-    public Result<?> getRealTimeData(@PathVariable Long sensorId) {
+    @GetMapping("/realtime/{clientId}")
+    public Result<?> getRealTimeData(@PathVariable String clientId) {
         try {
-            if (sensorId == null || sensorId <= 0) {
-                return Result.fail("传感器ID必须大于0");
+            if (!StringUtils.hasText(clientId)) {
+                return Result.fail("设备号不能为空");
             }
-            Object data = soilService.getRealTimeData(sensorId);
+            Object data = soilService.getRealTimeData(clientId);
             return Result.success(data);
         } catch (Exception e) {
-            log.error("获取实时数据失败, sensorId: {}", sensorId, e);
+            log.error("获取实时数据失败, clientId: {}", clientId, e);
             return Result.fail("获取实时数据失败: " + e.getMessage());
         }
     }
@@ -57,14 +57,14 @@ public class SoilController {
     /**
      * 获取传感器历史数据
      */
-    @GetMapping("/history/{sensorId}")
+    @GetMapping("/history/{clientId}")
     public Result<List<?>> getHistoryData(
-            @PathVariable Long sensorId,
+            @PathVariable String clientId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end) {
         try {
-            if (sensorId == null || sensorId <= 0) {
-                return Result.fail("传感器ID必须大于0");
+            if (!StringUtils.hasText(clientId)) {
+                return Result.fail("设备号不能为空");
             }
             
             LocalDateTime startTime = null;
@@ -89,9 +89,9 @@ public class SoilController {
                 return Result.fail("开始时间不能大于结束时间");
             }
             
-            return Result.success(soilService.getHistoryData(sensorId, startTime, endTime));
+            return Result.success(soilService.getHistoryData(clientId, startTime, endTime));
         } catch (Exception e) {
-            log.error("获取历史数据失败, sensorId: {}, start: {}, end: {}", sensorId, start, end, e);
+            log.error("获取历史数据失败, clientId: {}, start: {}, end: {}", clientId, start, end, e);
             return Result.fail("获取历史数据失败: " + e.getMessage());
         }
     }
@@ -99,16 +99,16 @@ public class SoilController {
     /**
      * 获取传感器历史数据（分页）
      */
-    @GetMapping("/history/{sensorId}/page")
+    @GetMapping("/history/{clientId}/page")
     public Result<Map<String, Object>> getHistoryDataPage(
-            @PathVariable Long sensorId,
+            @PathVariable String clientId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         try {
-            if (sensorId == null || sensorId <= 0) {
-                return Result.fail("传感器ID必须大于0");
+            if (!StringUtils.hasText(clientId)) {
+                return Result.fail("设备号不能为空");
             }
             if (page <= 0) {
                 return Result.fail("页码必须大于0");
@@ -139,10 +139,10 @@ public class SoilController {
                 return Result.fail("开始时间不能大于结束时间");
             }
             
-            return Result.success(soilService.getHistoryDataPage(sensorId, startTime, endTime, page, size));
+            return Result.success(soilService.getHistoryDataPage(clientId, startTime, endTime, page, size));
         } catch (Exception e) {
-            log.error("获取历史数据失败, sensorId: {}, start: {}, end: {}, page: {}, size: {}", 
-                    sensorId, start, end, page, size, e);
+            log.error("获取历史数据失败, clientId: {}, start: {}, end: {}, page: {}, size: {}",
+                    clientId, start, end, page, size, e);
             return Result.fail("获取历史数据失败: " + e.getMessage());
         }
     }
@@ -180,20 +180,20 @@ public class SoilController {
     /**
      * 获取数据趋势
      */
-    @GetMapping("/trend/{sensorId}")
+    @GetMapping("/trend/{clientId}")
     public Result<Map<String, Object>> getTrend(
-            @PathVariable Long sensorId,
+            @PathVariable String clientId,
             @RequestParam(defaultValue = "7") int days) {
         try {
-            if (sensorId == null || sensorId <= 0) {
-                return Result.fail("传感器ID必须大于0");
+            if (!StringUtils.hasText(clientId)) {
+                return Result.fail("设备号不能为空");
             }
             if (days <= 0 || days > 365) {
                 return Result.fail("天数必须在 1-365 之间");
             }
-            return Result.success(soilService.analyzeTrend(sensorId, days));
+            return Result.success(soilService.analyzeTrend(clientId, days));
         } catch (Exception e) {
-            log.error("获取趋势数据失败, sensorId: {}, days: {}", sensorId, days, e);
+            log.error("获取趋势数据失败, clientId: {}, days: {}", clientId, days, e);
             return Result.fail("获取趋势数据失败: " + e.getMessage());
         }
     }

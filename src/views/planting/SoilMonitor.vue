@@ -2,26 +2,27 @@
   <div class="soil-monitor">
     <!-- 顶部筛选区 -->
     <div class="filter-bar">
-      <el-select v-model="selectedSensor" placeholder="选择设备编号" size="large" style="width: 200px">
+      <el-select v-model="selectedSensor" placeholder="选择设备编号" size="large" style="width: 240px" :disabled="loading">
         <el-option v-for="sensor in sensors" :key="sensor.id" :label="sensor.deviceCode" :value="sensor.id" />
       </el-select>
 
       <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期"
-        end-placeholder="结束日期" size="large" />
+        end-placeholder="结束日期" size="large" :disabled="loading" />
 
-      <el-button type="primary" size="large" @click="refreshData">
+      <el-button type="primary" size="large" :loading="loading" @click="refreshData">
         <el-icon>
           <Refresh />
         </el-icon> 刷新数据
       </el-button>
 
-      <el-button size="large" @click="exportData">
+      <el-button size="large" :disabled="loading" @click="exportData">
         <el-icon>
           <Download />
         </el-icon> 导出数据
       </el-button>
     </div>
 
+    <div class="content-wrapper" v-loading="loading" element-loading-text="设备数据加载中...">
     <!-- 实时监测仪表盘 -->
     <div class="section">
       <div class="section-title">
@@ -33,7 +34,7 @@
         <div v-for="item in gaugeData" :key="item.name" class="gauge-item">
           <div class="gauge-chart">
             <div class="gauge-value-container">
-              <div class="gauge-value" :style="{ color: item.color }">{{ item.value }}</div>
+              <div class="gauge-value" :style="{ color: item.color }">{{ formatGaugeValue(item.value) }}</div>
               <div class="gauge-unit">{{ item.unit }}</div>
             </div>
             <el-progress type="dashboard" :percentage="item.percentage" :color="item.color" :stroke-width="10"
@@ -90,44 +91,43 @@
 
         <el-table-column prop="moisture" label="土壤湿度(%)" min-width="120" align="right">
           <template #default="{ row }">
-            <span :class="getMoistureClass(row.moisture)" style="padding-right: 15px; font-weight: 500;">{{ row.moisture
-              }}%</span>
+            <span :class="getMoistureClass(row.moisture)" style="padding-right: 15px; font-weight: 500;">{{ formatValue(row.moisture, '%') }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="temperature" label="土壤温度(°C)" min-width="120" align="right">
           <template #default="{ row }">
-            <span style="padding-right: 15px;">{{ row.temperature }}</span>
+            <span style="padding-right: 15px;">{{ formatValue(row.temperature) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="ph" label="pH值" min-width="100" align="right">
           <template #default="{ row }">
-            <span :class="getPhClass(row.ph)" style="padding-right: 15px;">{{ row.ph }}</span>
+            <span :class="getPhClass(row.ph)" style="padding-right: 15px;">{{ formatValue(row.ph) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="ec" label="EC值(mS/cm)" min-width="130" align="right">
           <template #default="{ row }">
-            <span style="padding-right: 15px;">{{ row.ec }}</span>
+            <span style="padding-right: 15px;">{{ formatValue(row.ec) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="nitrogen" label="氮(mg/kg)" min-width="120" align="right">
           <template #default="{ row }">
-            <span style="padding-right: 15px;">{{ row.nitrogen }}</span>
+            <span style="padding-right: 15px;">{{ formatValue(row.nitrogen) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="phosphorus" label="磷(mg/kg)" min-width="120" align="right">
           <template #default="{ row }">
-            <span style="padding-right: 15px;">{{ row.phosphorus }}</span>
+            <span style="padding-right: 15px;">{{ formatValue(row.phosphorus) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="potassium" label="钾(mg/kg)" min-width="120" align="right">
           <template #default="{ row }">
-            <span style="padding-right: 15px;">{{ row.potassium }}</span>
+            <span style="padding-right: 15px;">{{ formatValue(row.potassium) }}</span>
           </template>
         </el-table-column>
 
@@ -164,6 +164,7 @@
           @current-change="(p) => handlePageChange(p, pageSize)" />
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -172,7 +173,7 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Download } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { soilApi } from '@/api'
+import { devicePushApi, soilApi } from '@/api'
 
 // 响应式数据
 const selectedSensor = ref('')
@@ -184,9 +185,8 @@ const total = ref(100)
 const updateTime = ref('')
 const loading = ref(false)
 
-// 设备列表（从传感器表获取）
+// 设备列表（直接使用 device_push_data 中的 client_id）
 const sensors = ref([])
-const fields = ref([])
 
 const gaugeData = reactive([
   {
@@ -265,6 +265,24 @@ const radarChart = ref(null)
 let trendChartInstance = null
 let radarChartInstance = null
 
+const isEmptyValue = (value) => value === null || value === undefined || value === ''
+
+const formatValue = (value, unit = '') => {
+  if (isEmptyValue(value)) return '—'
+  return `${value}${unit}`
+}
+
+const formatGaugeValue = (value) => {
+  if (isEmptyValue(value)) return '—'
+  return typeof value === 'number' ? Number(value).toFixed(2).replace(/\.00$/, '') : value
+}
+
+const formatTooltipNumber = (value, unit = '') => {
+  if (isEmptyValue(value)) return `—${unit}`
+  const numeric = Number(value)
+  return `${Number.isNaN(numeric) ? value : numeric.toFixed(2)}${unit}`
+}
+
 // 初始化趋势图
 const initTrendChart = () => {
   if (!trendChart.value) return
@@ -286,7 +304,7 @@ const initTrendChart = () => {
           else if (param.seriesName === '氮含量') unit = 'mg/kg'
           else if (param.seriesName === '磷钾含量') unit = 'mg/kg'
 
-          result += `${param.marker} ${param.seriesName}: ${param.value?.toFixed(2)}${unit}<br/>`
+          result += `${param.marker} ${param.seriesName}: ${formatTooltipNumber(param.value, unit)}<br/>`
         })
         return result
       }
@@ -429,13 +447,13 @@ async function updateRadarChart() {
       }
 
       // 各指标评分计算
-      const moistureScore = Math.min(100, (data.moisture ?? 0)) // 湿度0-100
-      const phScore = data.ph ? Math.max(0, 100 - Math.abs(data.ph - 6.5) * 20) : 0 // pH以6.5为最佳
-      const tempScore = data.temperature ? Math.min(100, (data.temperature / 40) * 100) : 0 // 温度0-40
-      const ecScore = data.ec ? Math.min(100, (data.ec / 3) * 100) : 0 // EC 0-3
-      const fertilityScore = data.nitrogen && data.phosphorus && data.potassium
+      const moistureScore = data.moisture != null ? Math.min(100, data.moisture) : 0
+      const phScore = data.ph != null ? Math.max(0, 100 - Math.abs(data.ph - 6.5) * 20) : 0
+      const tempScore = data.temperature != null ? Math.min(100, (data.temperature / 40) * 100) : 0
+      const ecScore = data.ec != null ? Math.min(100, (data.ec / 3) * 100) : 0
+      const fertilityScore = data.nitrogen != null && data.phosphorus != null && data.potassium != null
         ? Math.min(100, ((data.nitrogen + data.phosphorus + data.potassium) / 300) * 100)
-        : 0 // N+P+K 总和0-300
+        : 0
 
       return {
         value: [moistureScore, phScore, fertilityScore, tempScore, ecScore],
@@ -453,11 +471,11 @@ async function updateRadarChart() {
           const rawData = dataItem?.rawData
           let result = `<strong>${dataItem.name}</strong><br/>`
 
-          result += `湿度评分: ${dataItem.value[0].toFixed(1)} (${rawData?.moisture?.toFixed(1)}%)<br/>`
-          result += `pH适宜度: ${dataItem.value[1].toFixed(1)} (${rawData?.ph?.toFixed(1)})<br/>`
-          result += `肥力综合: ${dataItem.value[2].toFixed(1)} (N:${rawData?.nitrogen?.toFixed(1) || 0} P:${rawData?.phosphorus?.toFixed(1) || 0} K:${rawData?.potassium?.toFixed(1) || 0})<br/>`
-          result += `温度适宜: ${dataItem.value[3].toFixed(1)} (${rawData?.temperature?.toFixed(1)}°C)<br/>`
-          result += `EC健康度: ${dataItem.value[4].toFixed(1)} (${rawData?.ec?.toFixed(1)} mS/cm)`
+          result += `湿度评分: ${formatTooltipNumber(dataItem.value[0])} (${formatTooltipNumber(rawData?.moisture, '%')})<br/>`
+          result += `pH适宜度: ${formatTooltipNumber(dataItem.value[1])} (${formatTooltipNumber(rawData?.ph)})<br/>`
+          result += `肥力综合: ${formatTooltipNumber(dataItem.value[2])} (N:${formatTooltipNumber(rawData?.nitrogen)} P:${formatTooltipNumber(rawData?.phosphorus)} K:${formatTooltipNumber(rawData?.potassium)})<br/>`
+          result += `温度适宜: ${formatTooltipNumber(dataItem.value[3])} (${formatTooltipNumber(rawData?.temperature, '°C')})<br/>`
+          result += `EC健康度: ${formatTooltipNumber(dataItem.value[4])} (${formatTooltipNumber(rawData?.ec, ' mS/cm')})`
 
           return result
         }
@@ -497,8 +515,15 @@ function getRadarColor(index) {
 // 方法
 async function loadSensors() {
   try {
-    const sensorList = await soilApi.getSensors()
-    sensors.value = sensorList || []
+    const deviceList = await devicePushApi.getActiveDevices()
+    sensors.value = (deviceList || [])
+      .filter(item => item.clientId && item.soilPh != null)
+      .map(item => ({
+        id: item.clientId,
+        deviceCode: item.clientId,
+        deviceName: '土壤监测设备'
+      }))
+
     if (sensors.value.length > 0 && !selectedSensor.value) {
       selectedSensor.value = sensors.value[0].id
     }
@@ -507,8 +532,29 @@ async function loadSensors() {
   }
 }
 
+function getHistoryRangeParams() {
+  if (dateRange.value && dateRange.value.length === 2) {
+    return {
+      start: new Date(dateRange.value[0]).toISOString(),
+      end: new Date(dateRange.value[1]).toISOString()
+    }
+  }
+
+  const now = new Date()
+  return {
+    end: now.toISOString(),
+    start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  }
+}
+
 function updateGaugeStatus(index, value) {
   const gauge = gaugeData[index]
+  if (isEmptyValue(value)) {
+    gauge.status = 'info'
+    gauge.statusText = '暂无'
+    gauge.color = '#8c8c8c'
+    return
+  }
   if (value < gauge.min) {
     gauge.status = 'warning'
     gauge.statusText = '偏低'
@@ -532,39 +578,36 @@ function getTagType(status) {
 
 async function loadOverview() {
   if (!selectedSensor.value) return
-  loading.value = true
   try {
     const realtime = await soilApi.getRealTimeData(selectedSensor.value)
     if (realtime) {
-      // 更新湿度
-      gaugeData[0].value = realtime.moisture ?? 0
-      gaugeData[0].percentage = Math.round(realtime.moisture ?? 0)
-      updateGaugeStatus(0, realtime.moisture ?? 0)
+      const pkValue = realtime.phosphorus != null && realtime.potassium != null
+        ? realtime.phosphorus + realtime.potassium
+        : null
 
-      // 更新温度
-      gaugeData[1].value = realtime.temperature ?? 0
-      gaugeData[1].percentage = Math.round(((realtime.temperature ?? 0) / 40) * 100)
-      updateGaugeStatus(1, realtime.temperature ?? 0)
+      gaugeData[0].value = realtime.moisture ?? null
+      gaugeData[0].percentage = realtime.moisture != null ? Math.round(realtime.moisture) : 0
+      updateGaugeStatus(0, realtime.moisture)
 
-      // 更新pH
-      gaugeData[2].value = realtime.ph ?? 0
-      gaugeData[2].percentage = Math.round(((realtime.ph ?? 0) / 10) * 100)
-      updateGaugeStatus(2, realtime.ph ?? 0)
+      gaugeData[1].value = realtime.temperature ?? null
+      gaugeData[1].percentage = realtime.temperature != null ? Math.round((realtime.temperature / 40) * 100) : 0
+      updateGaugeStatus(1, realtime.temperature)
 
-      // 更新EC
-      gaugeData[3].value = realtime.ec ?? 0
-      gaugeData[3].percentage = Math.round(((realtime.ec ?? 0) / 3) * 100)
-      updateGaugeStatus(3, realtime.ec ?? 0)
+      gaugeData[2].value = realtime.ph ?? null
+      gaugeData[2].percentage = realtime.ph != null ? Math.round((realtime.ph / 10) * 100) : 0
+      updateGaugeStatus(2, realtime.ph)
 
-      // 更新氮含量
-      gaugeData[4].value = realtime.nitrogen ?? 0
-      gaugeData[4].percentage = Math.round(((realtime.nitrogen ?? 0) / 150) * 100)
-      updateGaugeStatus(4, realtime.nitrogen ?? 0)
+      gaugeData[3].value = realtime.ec ?? null
+      gaugeData[3].percentage = realtime.ec != null ? Math.round((realtime.ec / 3) * 100) : 0
+      updateGaugeStatus(3, realtime.ec)
 
-      // 更新磷钾含量
-      gaugeData[5].value = (realtime.phosphorus ?? 0) + (realtime.potassium ?? 0)
-      gaugeData[5].percentage = Math.round((((realtime.phosphorus ?? 0) + (realtime.potassium ?? 0)) / 200) * 100)
-      updateGaugeStatus(5, (realtime.phosphorus ?? 0) + (realtime.potassium ?? 0))
+      gaugeData[4].value = realtime.nitrogen ?? null
+      gaugeData[4].percentage = realtime.nitrogen != null ? Math.round((realtime.nitrogen / 150) * 100) : 0
+      updateGaugeStatus(4, realtime.nitrogen)
+
+      gaugeData[5].value = pkValue
+      gaugeData[5].percentage = pkValue != null ? Math.round((pkValue / 200) * 100) : 0
+      updateGaugeStatus(5, pkValue)
 
       updateTime.value = realtime.collectTime
         ? realtime.collectTime.replace('T', ' ').substring(0, 19)
@@ -572,30 +615,26 @@ async function loadOverview() {
     }
   } catch (e) {
     ElMessage.error('加载实时数据失败')
-  } finally {
-    loading.value = false
   }
 }
 
 async function loadHistoryData() {
   if (!selectedSensor.value) return
   try {
-    const sensorId = selectedSensor.value
-    const now = new Date()
-    const end = now.toISOString()
-    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const clientId = selectedSensor.value
+    const { start, end } = getHistoryRangeParams()
 
-    const history = await soilApi.getHistoryDataPage(sensorId, start, end, currentPage.value, pageSize.value)
+    const history = await soilApi.getHistoryDataPage(clientId, start, end, currentPage.value, pageSize.value)
     if (history && history.list) {
       tableData.value = (history.list || []).map(item => ({
         time: item.collectTime ? item.collectTime.replace('T', ' ').substring(0, 19) : '',
-        moisture: item.moisture ?? 0,
-        temperature: item.temperature ?? 0,
-        ph: item.ph ?? 0,
-        ec: item.ec ?? 0,
-        nitrogen: item.nitrogen ?? 0,
-        phosphorus: item.phosphorus ?? 0,
-        potassium: item.potassium ?? 0,
+        moisture: item.moisture ?? null,
+        temperature: item.temperature ?? null,
+        ph: item.ph ?? null,
+        ec: item.ec ?? null,
+        nitrogen: item.nitrogen ?? null,
+        phosphorus: item.phosphorus ?? null,
+        potassium: item.potassium ?? null,
         healthStatus: item.healthStatus,
         // 保存原始数据用于详细状态显示
         rawData: item
@@ -639,9 +678,9 @@ function handlePageChange(page, size) {
 async function loadTrendData() {
   if (!selectedSensor.value) return
   try {
-    const sensorId = selectedSensor.value
+    const clientId = selectedSensor.value
     const days = chartType.value === 'day' ? 1 : chartType.value === 'week' ? 7 : 30
-    const trend = await soilApi.getTrend(sensorId, days)
+    const trend = await soilApi.getTrend(clientId, days)
 
     if (trend) {
       initTrendChartWithData(trend)
@@ -649,6 +688,20 @@ async function loadTrendData() {
   } catch (e) {
     // 失败时使用默认图表
     initTrendChart()
+  }
+}
+
+async function loadDeviceData() {
+  if (!selectedSensor.value) return
+  loading.value = true
+  try {
+    await Promise.all([
+      loadOverview(),
+      loadHistoryData(),
+      loadTrendData()
+    ])
+  } finally {
+    loading.value = false
   }
 }
 
@@ -681,7 +734,7 @@ function initTrendChartWithData(trend) {
           else if (param.seriesName === '氮含量') unit = 'mg/kg'
           else if (param.seriesName === '磷钾含量') unit = 'mg/kg'
 
-          result += `${param.marker} ${param.seriesName}: ${param.value.toFixed(2)}${unit}<br/>`
+          result += `${param.marker} ${param.seriesName}: ${formatTooltipNumber(param.value, unit)}<br/>`
         })
         return result
       }
@@ -713,20 +766,17 @@ function initTrendChartWithData(trend) {
 }
 
 const refreshData = async () => {
-  await loadOverview()
-  await loadHistoryData()
+  await loadDeviceData()
   ElMessage.success('数据已刷新')
 }
 
 const exportData = async () => {
   if (!selectedSensor.value) return
   try {
-    const sensorId = selectedSensor.value
-    const now = new Date()
-    const end = now.toISOString()
-    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const clientId = selectedSensor.value
+    const { start, end } = getHistoryRangeParams()
 
-    const data = await soilApi.getHistoryData(sensorId, start, end)
+    const data = await soilApi.getHistoryData(clientId, start, end)
     if (!data || data.length === 0) {
       ElMessage.warning('暂无数据可导出')
       return
@@ -734,7 +784,16 @@ const exportData = async () => {
 
     const csv = ['时间,湿度,温度,pH值,EC值,氮,磷,钾']
     data.forEach(row => {
-      csv.push([row.collectTime, row.moisture, row.temperature, row.ph, row.ec, row.nitrogen, row.phosphorus, row.potassium].join(','))
+      csv.push([
+        row.collectTime || '',
+        row.moisture ?? '',
+        row.temperature ?? '',
+        row.ph ?? '',
+        row.ec ?? '',
+        row.nitrogen ?? '',
+        row.phosphorus ?? '',
+        row.potassium ?? ''
+      ].join(','))
     })
 
     const blob = new Blob(['﻿' + csv.join('\n')], { type: 'text/csv;charset=utf-8' })
@@ -752,12 +811,14 @@ const exportData = async () => {
 }
 
 const getMoistureClass = (val) => {
+  if (isEmptyValue(val)) return ''
   if (val < 30) return 'text-danger'
   if (val > 70) return 'text-warning'
   return 'text-success'
 }
 
 const getPhClass = (val) => {
+  if (isEmptyValue(val)) return ''
   if (val < 6.0 || val > 7.5) return 'text-warning'
   return 'text-success'
 }
@@ -776,13 +837,17 @@ onMounted(async () => {
 })
 
 watch(chartType, () => {
-  loadTrendData()
+  loadDeviceData()
 })
 
 watch(selectedSensor, () => {
-  loadOverview()
-  loadHistoryData()
-  loadTrendData()
+  currentPage.value = 1
+  loadDeviceData()
+})
+
+watch(dateRange, () => {
+  currentPage.value = 1
+  loadDeviceData()
 })
 </script>
 

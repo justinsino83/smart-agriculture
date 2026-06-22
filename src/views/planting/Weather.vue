@@ -2,35 +2,29 @@
   <div class="weather-page">
     <!-- 第一行：筛选条件 -->
     <div class="filter-row">
-      <el-select v-model="filterForm.deviceCode" placeholder="选择设备号" clearable size="default" style="width: 200px"
+      <el-select v-model="filterForm.clientId" placeholder="选择设备号" clearable size="default" style="width: 240px"
+        :disabled="loading"
         @change="handleFilterChange">
-        <el-option label="1号田土壤传感器" value="SS20240001" />
-        <el-option label="2号田土壤传感器" value="SS20240002" />
-        <el-option label="3号田土壤传感器" value="SS20240003" />
-        <el-option label="5号田土壤传感器" value="SS20240005" />
-        <el-option label="6号田土壤传感器" value="SS20240006" />
-        <el-option label="7号田土壤传感器" value="SS20240007" />
-        <el-option label="9号田土壤传感器" value="SS20240009" />
-        <el-option label="10号田土壤传感器" value="SS20240010" />
-        <el-option label="12号田土壤传感器" value="SS20240012" />
+        <el-option v-for="device in devices" :key="device.clientId" :label="device.clientId" :value="device.clientId" />
       </el-select>
 
       <el-date-picker v-model="filterForm.dateRange" type="datetimerange" range-separator="至" start-placeholder="开始时间"
-        end-placeholder="结束时间" size="default" style="width: 380px" @change="handleFilterChange" />
+        end-placeholder="结束时间" size="default" style="width: 380px" :disabled="loading" @change="handleFilterChange" />
 
-      <el-button type="primary" @click="handleRefresh">
+      <el-button type="primary" :loading="loading" @click="handleRefresh">
         <el-icon>
           <Refresh />
         </el-icon> 刷新数据
       </el-button>
 
-      <el-button @click="handleExport">
+      <el-button :disabled="loading" @click="handleExport">
         <el-icon>
           <Download />
         </el-icon> 导出数据
       </el-button>
     </div>
 
+    <div class="content-wrapper" v-loading="loading" element-loading-text="设备数据加载中...">
     <!-- 第二行：实时数据卡片 -->
     <div class="realtime-cards">
       <div class="realtime-card">
@@ -40,7 +34,7 @@
           </el-icon>
         </div>
         <div class="card-content">
-          <div class="card-value">{{ currentData.temperature }}°C</div>
+          <div class="card-value">{{ formatValue(currentData.temperature, '°C') }}</div>
           <div class="card-label">温度</div>
         </div>
       </div>
@@ -52,7 +46,7 @@
           </el-icon>
         </div>
         <div class="card-content">
-          <div class="card-value">{{ currentData.humidity }}%</div>
+          <div class="card-value">{{ formatValue(currentData.humidity, '%') }}</div>
           <div class="card-label">湿度</div>
         </div>
       </div>
@@ -64,7 +58,7 @@
           </el-icon>
         </div>
         <div class="card-content">
-          <div class="card-value">{{ currentData.windSpeed }} m/s</div>
+          <div class="card-value">{{ formatValue(currentData.windSpeed, 'm/s') }}</div>
           <div class="card-label">风速</div>
         </div>
       </div>
@@ -88,8 +82,32 @@
           </el-icon>
         </div>
         <div class="card-content">
-          <div class="card-value">{{ currentData.pressure }} hPa</div>
+          <div class="card-value">{{ formatValue(currentData.pressure, 'hPa') }}</div>
           <div class="card-label">气压</div>
+        </div>
+      </div>
+
+      <div class="realtime-card">
+        <div class="card-icon cyan">
+          <el-icon>
+            <Download />
+          </el-icon>
+        </div>
+        <div class="card-content">
+          <div class="card-value">{{ formatValue(currentData.rainfall, 'mm') }}</div>
+          <div class="card-label">雨量</div>
+        </div>
+      </div>
+
+      <div class="realtime-card">
+        <div class="card-icon orange">
+          <el-icon>
+            <Sunny />
+          </el-icon>
+        </div>
+        <div class="card-content">
+          <div class="card-value">{{ formatValue(currentData.lightIntensity, 'lux') }}</div>
+          <div class="card-label">光照强度</div>
         </div>
       </div>
 
@@ -100,8 +118,20 @@
           </el-icon>
         </div>
         <div class="card-content">
-          <div class="card-value">{{ currentData.weatherText || '—' }}</div>
-          <div class="card-label">天气</div>
+          <div class="card-value">{{ formatValue(currentData.dewTemp, '°C') }}</div>
+          <div class="card-label">露点温度</div>
+        </div>
+      </div>
+
+      <div class="realtime-card">
+        <div class="card-icon purple">
+          <el-icon>
+            <Odometer />
+          </el-icon>
+        </div>
+        <div class="card-content">
+          <div class="card-value">{{ formatValue(currentData.co2, 'ppm') }}</div>
+          <div class="card-label">二氧化碳</div>
         </div>
       </div>
     </div>
@@ -167,10 +197,12 @@
           <el-table-column prop="windSpeed" label="风速(m/s)" min-width="120" align="right">
             <template #default="{ row }">
               <span style="padding-right: 15px; font-weight: 500;">
-                {{ row.windSpeed }}
+                {{ formatValue(row.windSpeed, 'm/s') }}
               </span>
             </template>
           </el-table-column>
+
+          <el-table-column prop="recordCount" label="记录数" min-width="100" align="right" />
 
           <el-table-column label="风向示意" min-width="180" align="center">
             <template #default="{ row }">
@@ -181,7 +213,20 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <div class="table-pagination">
+          <el-pagination
+            v-model:current-page="windPage.current"
+            v-model:page-size="windPage.size"
+            :total="windPage.total"
+            :page-sizes="[10, 20, 50]"
+            layout="total, sizes, prev, pager, next"
+            @current-change="updateHourlyWindPage"
+            @size-change="handleWindPageSizeChange"
+          />
+        </div>
       </div>
+    </div>
     </div>
   </div>
 </template>
@@ -190,7 +235,7 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { Refresh, Download, Sunny, WindPower, Compass, Odometer, QuartzWatch, Sunrise } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { weatherApi } from '@/api'
+import { devicePushApi, weatherApi } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const tempChart = ref(null)
@@ -200,6 +245,7 @@ let tempChartInstance = null
 let humidityChartInstance = null
 let windChartInstance = null
 const loading = ref(false)
+const devices = ref([])
 
 const currentData = reactive({
   temperature: '--',
@@ -208,15 +254,25 @@ const currentData = reactive({
   windDirection: null,
   windDirectionName: '--',
   pressure: '--',
+  rainfall: '--',
+  lightIntensity: '--',
+  dewTemp: '--',
+  co2: '--',
   weatherText: '--'
 })
 
 const filterForm = reactive({
-  deviceCode: '',
+  clientId: '',
   dateRange: null
 })
 
+const allHourlyWindData = ref([])
 const hourlyWindData = ref([])
+const windPage = reactive({
+  current: 1,
+  size: 10,
+  total: 0
+})
 
 function getDirectionName(degree) {
   if (!degree) return '--'
@@ -230,6 +286,131 @@ function getWindDirectionColor(degree) {
   const colors = ['#1890ff', '#36cfc9', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#eb2f96', '#fa8c16']
   const index = Math.round((degree % 360) / 45) % 8
   return colors[index]
+}
+
+function formatValue(value, unit = '') {
+  if (value === null || value === undefined || value === '' || value === '--') {
+    return '—'
+  }
+  return `${value} ${unit}`.trim()
+}
+
+function extractHourKey(time) {
+  if (!time) return ''
+
+  if (/^\d{2}:\d{2}$/.test(time)) {
+    return `${time.slice(0, 2)}:00`
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}/.test(time)) {
+    const normalized = time.replace(' ', 'T')
+    return `${normalized.slice(0, 13)}:00`
+  }
+
+  const date = new Date(time)
+  if (Number.isNaN(date.getTime())) {
+    return String(time)
+  }
+
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  return `${month}-${day} ${hour}:00`
+}
+
+function aggregateHourlyWindData(records) {
+  const grouped = new Map()
+
+  ;(records || []).forEach((item) => {
+    if (!item?.time) return
+    const key = extractHourKey(item.time)
+    if (!key) return
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        time: key,
+        sinSum: 0,
+        cosSum: 0,
+        speedSum: 0,
+        speedCount: 0,
+        recordCount: 0
+      })
+    }
+
+    const bucket = grouped.get(key)
+    bucket.recordCount += 1
+
+    if (item.direction != null) {
+      const radians = (item.direction * Math.PI) / 180
+      bucket.sinSum += Math.sin(radians)
+      bucket.cosSum += Math.cos(radians)
+    }
+
+    if (item.windSpeed != null && item.windSpeed !== '') {
+      bucket.speedSum += Number(item.windSpeed)
+      bucket.speedCount += 1
+    }
+  })
+
+  return Array.from(grouped.values())
+    .map((bucket) => {
+      let direction = null
+      if (bucket.sinSum !== 0 || bucket.cosSum !== 0) {
+        direction = Math.round((Math.atan2(bucket.sinSum, bucket.cosSum) * 180) / Math.PI)
+        if (direction < 0) direction += 360
+      }
+
+      const windSpeed = bucket.speedCount > 0 ? Number((bucket.speedSum / bucket.speedCount).toFixed(2)) : null
+
+      return {
+        time: bucket.time,
+        direction,
+        directionName: direction != null ? getDirectionName(direction) : '—',
+        windSpeed,
+        recordCount: bucket.recordCount
+      }
+    })
+    .sort((a, b) => b.time.localeCompare(a.time))
+}
+
+function updateHourlyWindPage() {
+  const start = (windPage.current - 1) * windPage.size
+  const end = start + windPage.size
+  hourlyWindData.value = allHourlyWindData.value.slice(start, end)
+}
+
+function handleWindPageSizeChange(size) {
+  windPage.size = size
+  windPage.current = 1
+  updateHourlyWindPage()
+}
+
+async function loadDevices() {
+  try {
+    const list = await devicePushApi.getActiveDevices()
+    const weatherDevices = (list || []).filter(item =>
+      item.clientId && (
+        item.ambientTemperature != null ||
+        item.ambientHumidity != null ||
+        item.pressure != null ||
+        item.windSpeed != null ||
+        item.windDirection != null ||
+        item.rainfall != null ||
+        item.lightIntensity != null ||
+        item.dewTemp != null ||
+        item.co2 != null
+      )
+    )
+
+    devices.value = weatherDevices
+      .map(item => ({ clientId: item.clientId }))
+      .filter((item, index, arr) => arr.findIndex(v => v.clientId === item.clientId) === index)
+
+    if (!filterForm.clientId && devices.value.length > 0) {
+      filterForm.clientId = devices.value[0].clientId
+    }
+  } catch (error) {
+    console.error('加载气象设备列表失败', error)
+  }
 }
 
 function initTempChart(data) {
@@ -361,13 +542,13 @@ async function loadWeatherData() {
       endTime = filterForm.dateRange[1].toISOString()
     }
 
-    const deviceCode = filterForm.deviceCode || null
+    const clientId = filterForm.clientId || null
 
     const [current, tempTrend, humidityTrend, windTrend] = await Promise.all([
-      weatherApi.getCurrentWeather(deviceCode),
-      weatherApi.get24HourTrend(deviceCode, startTime, endTime),
-      weatherApi.get24HourHumidityTrend(deviceCode, startTime, endTime),
-      weatherApi.get24HourWindDirectionTrend(deviceCode, startTime, endTime)
+      weatherApi.getCurrentWeather(clientId),
+      weatherApi.get24HourTrend(clientId, startTime, endTime),
+      weatherApi.get24HourHumidityTrend(clientId, startTime, endTime),
+      weatherApi.get24HourWindDirectionTrend(clientId, startTime, endTime)
     ])
 
     // 更新当前数据
@@ -378,6 +559,10 @@ async function loadWeatherData() {
       currentData.windDirection = current.windDirection
       currentData.windDirectionName = current.windDirection ? getDirectionName(current.windDirection) : '--'
       currentData.pressure = current.pressure
+      currentData.rainfall = current.rainfall
+      currentData.lightIntensity = current.lightIntensity
+      currentData.dewTemp = current.dewTemp
+      currentData.co2 = current.co2
       currentData.weatherText = current.weatherText || '--'
     } else {
       currentData.temperature = '--'
@@ -386,6 +571,10 @@ async function loadWeatherData() {
       currentData.windDirection = null
       currentData.windDirectionName = '--'
       currentData.pressure = '--'
+      currentData.rainfall = '--'
+      currentData.lightIntensity = '--'
+      currentData.dewTemp = '--'
+      currentData.co2 = '--'
       currentData.weatherText = '--'
     }
 
@@ -409,11 +598,10 @@ async function loadWeatherData() {
     }
 
     // 更新每小时风向数据
-    if (windTrend?.hourlyWindDirection && windTrend.hourlyWindDirection.length > 0) {
-      hourlyWindData.value = windTrend.hourlyWindDirection
-    } else {
-      hourlyWindData.value = []
-    }
+    allHourlyWindData.value = aggregateHourlyWindData(windTrend?.hourlyWindDirection || [])
+    windPage.total = allHourlyWindData.value.length
+    windPage.current = 1
+    updateHourlyWindPage()
   } catch (e) {
     ElMessage.error('加载天气数据失败: ' + e.message)
   } finally {
@@ -439,8 +627,9 @@ function handleResize() {
   windChartInstance?.resize()
 }
 
-onMounted(() => {
-  loadWeatherData()
+onMounted(async () => {
+  await loadDevices()
+  await loadWeatherData()
   window.addEventListener('resize', handleResize)
 })
 
@@ -563,6 +752,16 @@ onUnmounted(() => {
 
 .chart {
   height: 260px;
+}
+
+.content-wrapper {
+  min-height: 320px;
+}
+
+.table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 
 .wind-arrow {

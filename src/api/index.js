@@ -1,7 +1,8 @@
 import axios from 'axios'
+import router from '@/router'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://110.42.225.206:8280',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8280',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -29,11 +30,42 @@ api.interceptors.request.use(
   }
 )
 
+// 统一清除登录状态并跳转到登录页
+const clearAuthAndRedirect = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('userInfo')
+  sessionStorage.removeItem('token')
+  sessionStorage.removeItem('userInfo')
+  setTimeout(() => {
+    router.push('/login')
+  }, 100)
+}
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
     const res = response.data
     if (res && typeof res.code === 'number') {
+      // 处理业务层的未登录状态（后端NotLoginException返回HTTP 200但code为非200）
+      const msg = (res.message || '').toLowerCase()
+      // 精确匹配"未登录"相关关键字，避免误匹配"登录成功"等正常消息
+      const isNotLoggedIn = (
+        res.code === 401 ||
+        msg.includes('notlogin') ||
+        msg.includes('token无效') ||
+        msg.includes('token 无效') ||
+        msg.includes('未登录') ||
+        msg === 'token' ||
+        msg.includes('token已过期') ||
+        msg.includes('token 已过期') ||
+        msg.includes('please login') ||
+        msg.includes('session expired') ||
+        (msg.includes('token') && (msg.includes('invalid') || msg.includes('无效') || msg.includes('过期')))
+      )
+      if (isNotLoggedIn) {
+        clearAuthAndRedirect()
+        return Promise.reject(new Error(res.message || 'Session expired, please login again'))
+      }
       if (res.code === 200) {
         return res.data !== undefined ? res.data : res
       }
@@ -42,39 +74,32 @@ api.interceptors.response.use(
     return res
   },
   (error) => {
-    let message = 'Network error, please try again'
+    let message = '网络异常，请稍后重试'
     if (error.response) {
       const status = error.response.status
       const data = error.response.data
       switch (status) {
         case 400:
-          message = data?.message || 'Invalid parameters'
+          message = data?.message || '参数错误'
           break
         case 401:
-          message = 'Session expired, please login again'
-          // 清除所有认证信息
-          localStorage.removeItem('token')
-          localStorage.removeItem('userInfo')
-          sessionStorage.removeItem('token')
-          sessionStorage.removeItem('userInfo')
-          setTimeout(() => {
-            window.location.href = '/agridigital/login'
-          }, 500)
+          message = '登录状态已过期，请重新登录'
+          clearAuthAndRedirect()
           break
         case 403:
-          message = 'No permission'
+          message = '没有权限访问'
           break
         case 404:
-          message = 'Resource not found'
+          message = '请求资源不存在'
           break
         case 500:
-          message = data?.message || 'Server error'
+          message = data?.message || '服务器错误'
           break
         default:
-          message = `Request failed [${status}]`
+          message = `请求失败 [${status}]`
       }
     } else if (error.request) {
-      message = 'Server not responding'
+      message = '服务器未响应，请检查网络'
     } else {
       message = error.message
     }
@@ -102,22 +127,22 @@ export const insectApi = {
 
 // Weather APIs
 export const weatherApi = {
-  getCurrentWeather: (deviceCode) => api.get('/api/weather/current', { params: { deviceCode } }),
-  get24HourTrend: (deviceCode, startTime, endTime) => api.get('/api/weather/trend', { params: { deviceCode, startTime, endTime } }),
-  get24HourHumidityTrend: (deviceCode, startTime, endTime) => api.get('/api/weather/humidity-trend', { params: { deviceCode, startTime, endTime } }),
-  get24HourWindDirectionTrend: (deviceCode, startTime, endTime) => api.get('/api/weather/wind-direction-trend', { params: { deviceCode, startTime, endTime } }),
+  getCurrentWeather: (clientId) => api.get('/api/weather/current', { params: { clientId } }),
+  get24HourTrend: (clientId, startTime, endTime) => api.get('/api/weather/trend', { params: { clientId, startTime, endTime } }),
+  get24HourHumidityTrend: (clientId, startTime, endTime) => api.get('/api/weather/humidity-trend', { params: { clientId, startTime, endTime } }),
+  get24HourWindDirectionTrend: (clientId, startTime, endTime) => api.get('/api/weather/wind-direction-trend', { params: { clientId, startTime, endTime } }),
   getForecast: () => api.get('/api/weather/forecast'),
-  getAll: (deviceCode, startTime, endTime) => api.get('/api/weather/all', { params: { deviceCode, startTime, endTime } })
+  getAll: (clientId, startTime, endTime) => api.get('/api/weather/all', { params: { clientId, startTime, endTime } })
 }
 
 // Soil APIs
 export const soilApi = {
     getSensors: () => api.get('/api/soil/sensors'),
-    getRealTimeData: (sensorId) => api.get(`/api/soil/realtime/${sensorId}`),
-    getHistoryData: (sensorId, start, end) => api.get(`/api/soil/history/${sensorId}`, { params: { start, end } }),
-    getHistoryDataPage: (sensorId, start, end, page, size) => api.get(`/api/soil/history/${sensorId}/page`, { params: { start, end, page, size } }),
+    getRealTimeData: (clientId) => api.get(`/api/soil/realtime/${clientId}`),
+    getHistoryData: (clientId, start, end) => api.get(`/api/soil/history/${clientId}`, { params: { start, end } }),
+    getHistoryDataPage: (clientId, start, end, page, size) => api.get(`/api/soil/history/${clientId}/page`, { params: { start, end, page, size } }),
     getOverview: () => api.get('/api/soil/overview'),
-    getTrend: (sensorId, days = 7) => api.get(`/api/soil/trend/${sensorId}`, { params: { days } }),
+    getTrend: (clientId, days = 7) => api.get(`/api/soil/trend/${clientId}`, { params: { days } }),
     getStatistics: () => api.get('/api/soil/statistics'),
     getAlerts: () => api.get('/api/soil/alerts'),
     getRecommendations: () => api.get('/api/soil/recommendations')
@@ -195,6 +220,40 @@ export const facilityApi = {
   create: (data) => api.post('/api/facility', data),
   update: (id, data) => api.put(`/api/facility/${id}`, data),
   delete: (id) => api.delete(`/api/facility/${id}`)
+}
+
+// ========== IOT 设备接口（使用 Vite 代理） ==========
+const IOT_TOKEN = 'BCACAFFC658149958B6401A3F0179281'
+
+const iotApi = axios.create({
+  baseURL: '',
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+iotApi.interceptors.response.use(
+  (response) => {
+    return response.data
+  },
+  (error) => {
+    console.error('IOT API Error:', error)
+    return Promise.reject(error)
+  }
+)
+
+// IOT 设备接口
+export const iotDeviceApi = {
+  // 获取所有设备列表
+  listAllDevices: () => iotApi.post('/api/iot/manage/api/listAllDevices', {
+    token: IOT_TOKEN
+  }),
+  // 获取指定设备的实时值
+  getDeviceValues: (deviceId) => iotApi.post('/api/iot/manage/api/deviceValues', {
+    deviceId: deviceId,
+    token: IOT_TOKEN
+  })
 }
 
 export default api
